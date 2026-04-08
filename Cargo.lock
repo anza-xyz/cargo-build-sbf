@@ -496,10 +496,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dummy-for-ci"
-version = "4.1.0-alpha.0"
-
-[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
