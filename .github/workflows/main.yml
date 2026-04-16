@@ -24,8 +24,8 @@ jobs:
     steps:
       - name: Checkout source files
         uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
       - name: Cargo fmt
         run: cargo fmt --all --check
       - name: Cargo check
