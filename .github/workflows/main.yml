@@ -26,6 +26,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
+      - name: Install missing components
+        run: rustup component add rustfmt clippy
       - name: Cargo fmt
         run: cargo fmt --all --check
       - name: Cargo check
