@@ -61,6 +61,7 @@ fn strip_object(config: &Config, unstripped: &Path, stripped: &Path, llvm_bin: &
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_debug_objects(
     config: &Config,
     sbf_debug_dir: &Path,
