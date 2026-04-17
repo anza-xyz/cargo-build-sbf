@@ -56,4 +56,5 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: cargo test --workspace
       - name: Cargo test (skip alternate download)
+        if: matrix.os != 'ubuntu-22.04'
         run: cargo test --workspace  -- --skip test_alternate_download --skip test_binaries_work
