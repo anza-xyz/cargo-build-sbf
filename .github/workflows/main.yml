@@ -22,5 +22,39 @@ jobs:
           - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - run: |
-          echo "✅"
+      - name: Checkout source files
+        uses: actions/checkout@v4
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install missing components
+        run: rustup component add rustfmt clippy
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+      - name: Cargo check
+        run: cargo check --locked --workspace --all-targets
+      - name: Cargo clippy
+        if: matrix.os != 'windows-latest'
+        run: |
+          cargo clippy --workspace --all-targets -- \
+          --deny=warnings \
+          --deny=clippy::default_trait_access \
+          --deny=clippy::arithmetic_side_effects \
+          --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args \
+          --deny=clippy::used_underscore_binding
+      - name: Cargo clippy windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          cargo clippy --workspace --all-targets -- `
+           --deny=warnings `
+           --deny=clippy::default_trait_access `
+           --deny=clippy::arithmetic_side_effects `
+           --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args `
+           --deny=clippy::used_underscore_binding
+      - name: Cargo build
+        run: cargo build --workspace
+      - name: Cargo test
+        if: matrix.os == 'ubuntu-22.04'
+        run: cargo test --workspace
+      - name: Cargo test (skip alternate download)
+        if: matrix.os != 'ubuntu-22.04'
+        run: cargo test --workspace  -- --skip test_alternate_download --skip test_binaries_work
