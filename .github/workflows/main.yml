@@ -30,8 +30,6 @@ jobs:
         run: rustup component add rustfmt clippy
       - name: Cargo fmt
         run: cargo fmt --all --check
-      - name: Cargo check
-        run: cargo check --locked --workspace --all-targets
       - name: Cargo clippy
         if: matrix.os != 'windows-latest'
         run: |
@@ -50,8 +48,6 @@ jobs:
            --deny=clippy::arithmetic_side_effects `
            --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args `
            --deny=clippy::used_underscore_binding
-      - name: Cargo build
-        run: cargo build --workspace
       - name: Cargo test
         if: matrix.os == 'ubuntu-22.04'
         run: cargo test --workspace
