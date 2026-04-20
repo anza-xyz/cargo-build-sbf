@@ -31,7 +31,7 @@ jobs:
       - name: Cargo fmt
         run: cargo fmt --all --check
       - name: Cargo clippy
-        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           cargo clippy --workspace --all-targets -- \
           --deny=warnings \
@@ -39,15 +39,6 @@ jobs:
           --deny=clippy::arithmetic_side_effects \
           --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args \
           --deny=clippy::used_underscore_binding
-      - name: Cargo clippy windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          cargo clippy --workspace --all-targets -- `
-           --deny=warnings `
-           --deny=clippy::default_trait_access `
-           --deny=clippy::arithmetic_side_effects `
-           --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args `
-           --deny=clippy::used_underscore_binding
       - name: Cargo test
         if: matrix.os == 'ubuntu-22.04'
         run: cargo test --workspace
