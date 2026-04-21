@@ -52,6 +52,7 @@ pub struct Config<'a> {
     lto: bool,
     install_only: bool,
     patch_binaries_for_nix: Option<bool>,
+    use_abi_v2: bool,
 }
 
 impl Default for Config<'_> {
@@ -80,6 +81,7 @@ impl Default for Config<'_> {
             lto: false,
             install_only: false,
             patch_binaries_for_nix: None,
+            use_abi_v2: false,
         }
     }
 }
@@ -568,6 +570,10 @@ fn main() {
                 .possible_values(["true", "false"])
                 .help("Patch the downloaded toolchain binaries to work on nix systems"),
         )
+        .arg(Arg::new("abi_v2").long("abi-v2").takes_value(false).help(
+            "Compile program for ABIv2. This is still an experimental features and only works \
+             with `--arch v3`",
+        ))
         .get_matches_from(args);
 
     if matches.is_present("sbf_sdk") {
@@ -641,7 +647,14 @@ fn main() {
         patch_binaries_for_nix: matches
             .is_present("patch_binaries_for_nix")
             .then(|| matches.value_of_t("patch_binaries_for_nix").unwrap()),
+        use_abi_v2: matches.is_present("abi_v2"),
     };
+
+    if config.use_abi_v2 && config.arch != "v3" {
+        error!("--abi-v2 requires --arch v3");
+        return;
+    }
+
     let manifest_path: Option<PathBuf> = matches.value_of_t("manifest_path").ok();
     if config.verbose {
         debug!("{config:?}");

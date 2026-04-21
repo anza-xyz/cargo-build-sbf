@@ -9,8 +9,8 @@ use {
     regex::Regex,
     std::{
         collections::HashMap,
-        fs::{self, File},
-        io::{BufRead, BufReader, BufWriter, Write},
+        fs::{self, File, OpenOptions},
+        io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write},
         path::{Path, PathBuf},
         process::exit,
         str::FromStr,
@@ -34,6 +34,18 @@ fn file_older_or_missing(prerequisite_file: &Path, target_file: &Path) -> bool {
     } else {
         true
     }
+}
+
+fn patch_abi_v2_header(file_path: &PathBuf) {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(false)
+        .open(file_path)
+        .expect("Compiled object does not exist");
+
+    // The ELF flags field begins at the 48th byte of the file.
+    file.seek(SeekFrom::Start(48)).expect("File too small");
+    file.write_all(&4u32.to_le_bytes()).expect("File too small");
 }
 
 fn create_folders(config: &Config, deploy_folder: &PathBuf, debug_folder: &PathBuf) {
@@ -159,6 +171,10 @@ pub(crate) fn post_process(
         let program_dump = sbf_out_dir.join(format!("{program_name}-dump.txt"));
 
         let llvm_bin = platform_tools_dir.join("llvm").join("bin");
+
+        if config.use_abi_v2 {
+            patch_abi_v2_header(&program_unstripped_so);
+        }
 
         let program_so = if config.debug {
             generate_debug_objects(

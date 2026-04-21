@@ -194,8 +194,13 @@ fn test_generate_child_script_on_failure() {
     clean_target("fail");
 }
 
-fn build_noop_and_readelf(arch: &str) -> Assert {
-    run_cargo_build("noop", &["--arch", arch], false);
+fn build_noop_and_readelf(arch: &str, patch: bool) -> Assert {
+    let mut extra_args = vec!["--arch", arch];
+    if patch {
+        extra_args.push("--abi-v2");
+    };
+
+    run_cargo_build("noop", &extra_args, false);
     let cwd = env::current_dir().expect("Unable to get current working directory");
     let bin = cwd
         .join("tests")
@@ -216,7 +221,7 @@ fn build_noop_and_readelf(arch: &str) -> Assert {
 #[test]
 #[serial]
 fn test_sbpfv0() {
-    let assert_v0 = build_noop_and_readelf("v0");
+    let assert_v0 = build_noop_and_readelf("v0", false);
     assert_v0
         .stdout(predicate::str::contains(
             "Flags:                             0x0",
@@ -228,7 +233,7 @@ fn test_sbpfv0() {
 #[test]
 #[serial]
 fn test_sbpfv1() {
-    let assert_v1 = build_noop_and_readelf("v1");
+    let assert_v1 = build_noop_and_readelf("v1", false);
     assert_v1
         .stdout(predicate::str::contains(
             "Flags:                             0x1",
@@ -240,7 +245,7 @@ fn test_sbpfv1() {
 #[test]
 #[serial]
 fn test_sbpfv2() {
-    let assert_v1 = build_noop_and_readelf("v2");
+    let assert_v1 = build_noop_and_readelf("v2", false);
     assert_v1
         .stdout(predicate::str::contains(
             "Flags:                             0x2",
@@ -252,7 +257,7 @@ fn test_sbpfv2() {
 #[test]
 #[serial]
 fn test_sbpfv3() {
-    let assert_v1 = build_noop_and_readelf("v3");
+    let assert_v1 = build_noop_and_readelf("v3", false);
     assert_v1
         .stdout(predicate::str::contains(
             "Flags:                             0x3",
@@ -265,7 +270,19 @@ fn test_sbpfv3() {
 #[serial]
 #[ignore]
 fn test_sbpfv4() {
-    let assert_v1 = build_noop_and_readelf("v4");
+    let assert_v1 = build_noop_and_readelf("v4", false);
+    assert_v1
+        .stdout(predicate::str::contains(
+            "Flags:                             0x4",
+        ))
+        .success();
+    clean_target("noop");
+}
+
+#[test]
+#[serial]
+fn test_abi_v2_patch() {
+    let assert_v1 = build_noop_and_readelf("v3", true);
     assert_v1
         .stdout(predicate::str::contains(
             "Flags:                             0x4",
@@ -357,7 +374,7 @@ fn test_alternate_download() {
 
     assert!(output.status.success());
 
-    build_noop_and_readelf("v0");
+    build_noop_and_readelf("v0", false);
 }
 
 #[test]
