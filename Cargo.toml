@@ -6,8 +6,8 @@ resolver = "2"
 [workspace.package]
 version = "4.1.0-alpha.0"
 authors = ["Anza Maintainers <maintainers@anza.xyz>"]
-description = "Blockchain, Rebuilt for Scale"
-repository = "https://github.com/anza-xyz/agave"
+description = "Build Rust programs for Solana"
+repository = "https://github.com/anza-xyz/cargo-build-sbf"
 homepage = "https://anza.xyz/"
 license = "Apache-2.0"
 edition = "2021"
