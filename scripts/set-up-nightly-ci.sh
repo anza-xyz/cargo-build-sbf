@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 here=$(dirname "$0")
 source "${here}"/rust-version.sh nightly
 
