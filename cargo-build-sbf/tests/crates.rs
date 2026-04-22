@@ -7,8 +7,21 @@ use {
 #[macro_use]
 extern crate serial_test;
 
+#[cfg_attr(not(windows), allow(clippy::unnecessary_lazy_evaluations))]
 fn platform_tools_path() -> PathBuf {
-    let tools_path = env::var("HOME").unwrap();
+    let tools_path = env::var_os("HOME")
+        .or_else(|| {
+            #[cfg(windows)]
+            {
+                env::var_os("USERPROFILE")
+            }
+
+            #[cfg(not(windows))]
+            {
+                None
+            }
+        })
+        .unwrap();
     PathBuf::from(tools_path)
         .join(".cache")
         .join("solana")
@@ -277,6 +290,7 @@ fn test_workspace_metadata_tools_version() {
 
 #[test]
 #[serial]
+#[cfg(not(windows))]
 fn test_corrupted_toolchain() {
     run_cargo_build("noop", &[], false);
 
