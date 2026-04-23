@@ -91,7 +91,9 @@ pub fn home_dir() -> PathBuf {
             .or_else(|| {
                 #[cfg(windows)]
                 {
-                    debug!("Could not read env variable 'HOME', falling back to 'USERPROFILE'");
+                    log::debug!(
+                        "Could not read env variable 'HOME', falling back to 'USERPROFILE'"
+                    );
                     env::var_os("USERPROFILE")
                 }
 
