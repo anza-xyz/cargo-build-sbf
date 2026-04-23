@@ -13,6 +13,10 @@ edition = { workspace = true }
 name = "cargo-build-sbf"
 path = "src/bin/build_sbf.rs"
 
+[[bin]]
+name = "cargo-test-sbf"
+path = "src/bin/test_sbf.rs"
+
 [dependencies]
 agave-logger = { workspace = true }
 bzip2 = { workspace = true }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["cargo-build-sbf", "cargo-test-sbf", "gen-headers"]
+members = ["cargo-build-sbf", "gen-headers"]
 exclude = ["gen-headers"]
 resolver = "2"
 

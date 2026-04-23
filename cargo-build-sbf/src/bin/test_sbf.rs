@@ -39,8 +39,8 @@ impl Default for Config<'_> {
         Self {
             sbf_out_dir: None,
             platform_tools_version: None,
-            cargo: PathBuf::from("cargo"),
-            cargo_build_sbf: PathBuf::from("cargo-build-sbf"),
+            cargo: PathBuf::from("../../../cargo"),
+            cargo_build_sbf: PathBuf::from("../.."),
             extra_cargo_test_args: vec![],
             features: vec![],
             packages: vec![],

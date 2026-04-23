@@ -2043,18 +2043,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-cargo-test-sbf"
-version = "4.1.0-alpha.0"
-dependencies = [
- "agave-logger",
- "cargo_metadata",
- "clap",
- "itertools",
- "log",
- "regex",
-]
-
-[[package]]
 name = "solana-define-syscall"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
