@@ -1,9 +1,9 @@
 use {
     crate::{
-        Config, spawn,
+        config::Config,
         syscalls::SYSCALLS,
         toolchain::rust_target_triple,
-        utils::{copy_file, create_directory, generate_keypair},
+        utils::{copy_file, create_directory, generate_keypair, spawn},
     },
     log::{debug, error, info, warn},
     regex::Regex,
@@ -138,7 +138,7 @@ fn generate_release_objects(
     program_so
 }
 
-pub(crate) fn post_process(
+pub fn post_process(
     config: &Config,
     platform_tools_dir: &Path,
     target_directory: &Path,

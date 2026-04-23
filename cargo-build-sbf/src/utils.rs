@@ -12,7 +12,7 @@ use {
     },
 };
 
-pub(crate) fn spawn<I, S>(program: &Path, args: I, generate_child_script_on_failure: bool) -> String
+pub fn spawn<I, S>(program: &Path, args: I, generate_child_script_on_failure: bool) -> String
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -81,4 +81,27 @@ pub(crate) fn generate_keypair(path: &PathBuf) {
         error!("Unable to create {}: {err}", path.display());
         exit(1);
     });
+}
+
+pub fn home_dir() -> PathBuf {
+    PathBuf::from(
+        #[cfg_attr(not(windows), allow(clippy::unnecessary_lazy_evaluations))]
+        env::var_os("HOME")
+            .or_else(|| {
+                #[cfg(windows)]
+                {
+                    debug!("Could not read env variable 'HOME', falling back to 'USERPROFILE'");
+                    env::var_os("USERPROFILE")
+                }
+
+                #[cfg(not(windows))]
+                {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                error!("Can't get home directory path");
+                exit(1);
+            }),
+    )
 }

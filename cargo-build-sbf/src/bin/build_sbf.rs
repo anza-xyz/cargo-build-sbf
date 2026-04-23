@@ -1,10 +1,10 @@
-mod post_processing;
-mod syscalls;
-mod toolchain;
-mod utils;
-
 use {
-    crate::{
+    cargo_metadata::camino::Utf8PathBuf,
+    clap::{Arg, crate_description, crate_name, crate_version},
+    log::*,
+    regex::Regex,
+    solana_cargo_build_sbf::{
+        config::Config,
         post_processing::post_process,
         toolchain::{
             DEFAULT_PLATFORM_TOOLS_VERSION, corrupted_toolchain, generate_toolchain_name,
@@ -14,10 +14,6 @@ use {
         },
         utils::spawn,
     },
-    cargo_metadata::camino::Utf8PathBuf,
-    clap::{Arg, crate_description, crate_name, crate_version},
-    log::*,
-    regex::Regex,
     std::{
         borrow::Cow,
         env,
@@ -26,65 +22,6 @@ use {
         process::exit,
     },
 };
-
-#[derive(Debug)]
-pub struct Config<'a> {
-    cargo_args: Vec<&'a str>,
-    target_directory: Option<Utf8PathBuf>,
-    sbf_out_dir: Option<PathBuf>,
-    platform_tools_version: Option<&'a str>,
-    dump: bool,
-    features: Vec<String>,
-    force_tools_install: bool,
-    skip_tools_install: bool,
-    no_rustup_override: bool,
-    generate_child_script_on_failure: bool,
-    no_default_features: bool,
-    offline: bool,
-    remap_cwd: bool,
-    debug: bool,
-    verbose: bool,
-    quiet: bool,
-    workspace: bool,
-    jobs: Option<String>,
-    arch: &'a str,
-    optimize_size: bool,
-    lto: bool,
-    install_only: bool,
-    patch_binaries_for_nix: Option<bool>,
-    use_abi_v2: bool,
-}
-
-impl Default for Config<'_> {
-    fn default() -> Self {
-        Self {
-            cargo_args: vec![],
-            target_directory: None,
-            sbf_out_dir: None,
-            platform_tools_version: None,
-            dump: false,
-            features: vec![],
-            force_tools_install: false,
-            skip_tools_install: false,
-            no_rustup_override: false,
-            generate_child_script_on_failure: false,
-            no_default_features: false,
-            offline: false,
-            remap_cwd: true,
-            debug: false,
-            verbose: false,
-            quiet: false,
-            workspace: false,
-            jobs: None,
-            arch: "v0",
-            optimize_size: false,
-            lto: false,
-            install_only: false,
-            patch_binaries_for_nix: None,
-            use_abi_v2: false,
-        }
-    }
-}
 
 pub fn is_version_string(arg: &str) -> Result<(), String> {
     let semver_re = Regex::new(r"^v?[0-9]+\.[0-9]+(\.[0-9]+)?$").unwrap();
@@ -95,29 +32,6 @@ pub fn is_version_string(arg: &str) -> Result<(), String> {
         "a version string may start with 'v' and contains major and minor version numbers \
          separated by a dot, e.g. v1.32 or 1.32"
             .to_string(),
-    )
-}
-
-fn home_dir() -> PathBuf {
-    PathBuf::from(
-        #[cfg_attr(not(windows), allow(clippy::unnecessary_lazy_evaluations))]
-        env::var_os("HOME")
-            .or_else(|| {
-                #[cfg(windows)]
-                {
-                    debug!("Could not read env variable 'HOME', falling back to 'USERPROFILE'");
-                    env::var_os("USERPROFILE")
-                }
-
-                #[cfg(not(windows))]
-                {
-                    None
-                }
-            })
-            .unwrap_or_else(|| {
-                error!("Can't get home directory path");
-                exit(1);
-            }),
     )
 }
 

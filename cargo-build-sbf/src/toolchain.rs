@@ -1,5 +1,8 @@
 use {
-    crate::{Config, home_dir, utils::spawn},
+    crate::{
+        config::Config,
+        utils::{home_dir, spawn},
+    },
     bzip2::bufread::BzDecoder,
     log::{debug, error, info, warn},
     regex::Regex,
@@ -17,7 +20,7 @@ use {
     tar::Archive,
 };
 
-pub(crate) const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.54";
+pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.54";
 pub(crate) const DEFAULT_RUST_VERSION: &str = "1.89.0";
 
 // Common headers used for Github API.
@@ -91,10 +94,7 @@ fn semver_version(version: &str) -> String {
     }
 }
 
-pub(crate) fn validate_platform_tools_version(
-    requested_version: &str,
-    builtin_version: &str,
-) -> String {
+pub fn validate_platform_tools_version(requested_version: &str, builtin_version: &str) -> String {
     // Early return here in case it's the first time we're running `cargo build-sbf`
     // and we need to create the cache folders
     if requested_version == builtin_version {
@@ -128,7 +128,7 @@ pub(crate) fn validate_platform_tools_version(
     }
 }
 
-pub(crate) fn make_platform_tools_path_for_version(version: &str) -> PathBuf {
+pub fn make_platform_tools_path_for_version(version: &str) -> PathBuf {
     home_dir()
         .join(".cache")
         .join("solana")
@@ -136,7 +136,7 @@ pub(crate) fn make_platform_tools_path_for_version(version: &str) -> PathBuf {
         .join("platform-tools")
 }
 
-pub(crate) fn get_base_rust_version(platform_tools_version: &str) -> String {
+pub fn get_base_rust_version(platform_tools_version: &str) -> String {
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
     let rustc = target_path.join("rust").join("bin").join("rustc");
     if !rustc.exists() {
@@ -329,7 +329,7 @@ pub(crate) fn install_if_missing(
 
 // Check if we have all binaries in place to execute the build command.
 // If the download failed or the binaries were somehow deleted, inform the user how to fix it.
-pub(crate) fn corrupted_toolchain(platform_tools_dir: &Path) -> bool {
+pub fn corrupted_toolchain(platform_tools_dir: &Path) -> bool {
     let toolchain_path = platform_tools_dir.join("rust");
     let binaries = toolchain_path.join("bin");
 
@@ -342,7 +342,7 @@ pub(crate) fn corrupted_toolchain(platform_tools_dir: &Path) -> bool {
         || !cargo.try_exists().unwrap_or(false)
 }
 
-pub(crate) fn generate_toolchain_name(requested_toolchain_version: &str) -> String {
+pub fn generate_toolchain_name(requested_toolchain_version: &str) -> String {
     if requested_toolchain_version == DEFAULT_PLATFORM_TOOLS_VERSION {
         return format!("{DEFAULT_RUST_VERSION}-sbpf-solana-{DEFAULT_PLATFORM_TOOLS_VERSION}");
     }
@@ -422,7 +422,7 @@ fn link_solana_toolchain(
     }
 }
 
-pub(crate) fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) {
+pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) {
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
     install_if_missing(config, platform_tools_version, &target_path, use_rest_api).unwrap_or_else(
         |err| {
@@ -445,7 +445,7 @@ pub(crate) fn install_tools(config: &Config, platform_tools_version: &str, use_r
     );
 }
 
-pub(crate) fn install_and_link_tools(
+pub fn install_and_link_tools(
     config: &Config,
     package: Option<&cargo_metadata::Package>,
     metadata: &cargo_metadata::Metadata,
@@ -524,7 +524,7 @@ fn check_solana_target_installed(target: &str) {
     }
 }
 
-pub(crate) fn rust_target_triple(config: &Config) -> String {
+pub fn rust_target_triple(config: &Config) -> String {
     let tools_version = semver::Version::parse(&semver_version(
         config
             .platform_tools_version

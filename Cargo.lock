@@ -729,6 +729,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gen-headers"
+version = "4.1.0-alpha.0"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
