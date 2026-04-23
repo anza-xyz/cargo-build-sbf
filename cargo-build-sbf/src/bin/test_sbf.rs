@@ -1,15 +1,11 @@
 use {
     clap::{Arg, crate_description, crate_name, crate_version},
-    itertools::Itertools,
     log::*,
-    regex::Regex,
+    solana_cargo_build_sbf::utils::{is_version_string, spawn},
     std::{
         env,
-        ffi::OsStr,
-        fs::File,
-        io::{BufWriter, prelude::*},
         path::{Path, PathBuf},
-        process::{Command, exit},
+        process::exit,
     },
 };
 
@@ -57,61 +53,6 @@ impl Default for Config<'_> {
             arch: "v0",
         }
     }
-}
-
-fn spawn<I, S>(program: &Path, args: I, generate_child_script_on_failure: bool)
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let args = Vec::from_iter(args);
-    let msg = args
-        .iter()
-        .map(|arg| arg.as_ref().to_str().unwrap_or("?"))
-        .join(" ");
-    info!("spawn: {msg}");
-
-    let mut child = Command::new(program)
-        .args(args)
-        .spawn()
-        .unwrap_or_else(|err| {
-            error!("Failed to execute {}: {}", program.display(), err);
-            exit(1);
-        });
-
-    let exit_status = child.wait().expect("failed to wait on child");
-    if !exit_status.success() {
-        if !generate_child_script_on_failure {
-            exit(1);
-        }
-        error!("cargo-test-sbf exited on command execution failure");
-        let script_name = format!(
-            "cargo-test-sbf-child-script-{}.sh",
-            program.file_name().unwrap().to_str().unwrap(),
-        );
-        let file = File::create(&script_name).unwrap();
-        let mut out = BufWriter::new(file);
-        for (key, value) in env::vars() {
-            writeln!(out, "{key}=\"{value}\" \\").unwrap();
-        }
-        write!(out, "{}", program.display()).unwrap();
-        writeln!(out, "{msg}").unwrap();
-        out.flush().unwrap();
-        error!("To rerun the failed command for debugging use {script_name}");
-        exit(1);
-    }
-}
-
-pub fn is_version_string(arg: &str) -> Result<(), String> {
-    let semver_re = Regex::new(r"^v?[0-9]+\.[0-9]+(\.[0-9]+)?").unwrap();
-    if semver_re.is_match(arg) {
-        return Ok(());
-    }
-    Err(
-        "a version string may start with 'v' and contains major and minor version numbers \
-         separated by a dot, e.g. v1.32 or 1.32"
-            .to_string(),
-    )
 }
 
 fn test_solana_package(
