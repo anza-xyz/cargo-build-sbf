@@ -53,6 +53,7 @@ pub struct Config<'a> {
     install_only: bool,
     patch_binaries_for_nix: Option<bool>,
     use_abi_v2: bool,
+    sbf_stack_size: Option<u32>,
 }
 
 impl Default for Config<'_> {
@@ -82,6 +83,7 @@ impl Default for Config<'_> {
             install_only: false,
             patch_binaries_for_nix: None,
             use_abi_v2: false,
+            sbf_stack_size: None,
         }
     }
 }
@@ -194,6 +196,12 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         target_rustflags = Cow::Owned(format!(
             "{} -C embed-bitcode=yes -C lto=fat",
             &target_rustflags
+        ));
+    }
+    if let Some(stack_size) = config.sbf_stack_size {
+        target_rustflags = Cow::Owned(format!(
+            "{} -C llvm-args=-sbf-stack-size={}",
+            &target_rustflags, stack_size
         ));
     }
 
@@ -557,6 +565,17 @@ fn main() {
                      increasing CU consumption.",
                 ),
         )
+        .arg(
+            Arg::new("sbf_stack_size")
+                .long("sbf-stack-size")
+                .value_name("BYTES")
+                .takes_value(true)
+                .validator(|val| val.parse::<u32>().map_err(|e| e.to_string()))
+                .help(
+                    "Set the SBF stack frame size in bytes (default: 4096). Requires a \
+                     platform-tools version that supports the -sbf-stack-size LLVM option.",
+                ),
+        )
         .arg(Arg::new("lto").long("lto").takes_value(false).help(
             "Enable Link-Time Optimization (LTO) for all crates being built. This option may \
              decrease program size and CU consumption. The default option is LTO disabled, as one \
@@ -644,6 +663,7 @@ fn main() {
         optimize_size: matches.is_present("optimize_size"),
         lto: matches.is_present("lto"),
         install_only: matches.is_present("install_only"),
+        sbf_stack_size: matches.value_of_t("sbf_stack_size").ok(),
         patch_binaries_for_nix: matches
             .is_present("patch_binaries_for_nix")
             .then(|| matches.value_of_t("patch_binaries_for_nix").unwrap()),
