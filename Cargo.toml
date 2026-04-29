@@ -3,7 +3,7 @@ members = ["cargo-build-sbf", "gen-headers"]
 resolver = "2"
 
 [workspace.package]
-version = "4.1.0-alpha.0"
+version = "1.0.0"
 authors = ["Anza Maintainers <maintainers@anza.xyz>"]
 description = "Build Rust programs for Solana"
 repository = "https://github.com/anza-xyz/cargo-build-sbf"

@@ -730,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "gen-headers"
-version = "4.1.0-alpha.0"
+version = "1.0.0"
 dependencies = [
  "log",
  "regex",
@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "solana-cargo-build-sbf"
-version = "4.1.0-alpha.0"
+version = "1.0.0"
 dependencies = [
  "agave-logger",
  "assert_cmd",
