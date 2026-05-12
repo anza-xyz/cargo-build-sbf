@@ -1,7 +1,7 @@
 [package]
 name = "solana-cargo-build-sbf"
 description = "Compile a local package and all of its dependencies using the Solana SBF SDK"
-publish = false
+publish = true
 version = { workspace = true }
 authors = { workspace = true }
 repository = { workspace = true }
