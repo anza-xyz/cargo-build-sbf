@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -ex
 
-cd "$(dirname "$0")"/../../..
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+parent_dir="$(dirname "${dir}")"
 
 echo --- Creating sbf-sdk tarball
 
@@ -10,10 +11,11 @@ mkdir sbf-sdk/
 cp LICENSE sbf-sdk/
 
 (
-  ci/crate-version.sh platform-tools-sdk/cargo-build-sbf/Cargo.toml
+  "${dir}"/crate-version.sh "${parent_dir}"/Cargo.toml
   git rev-parse HEAD
 ) > sbf-sdk/version.txt
 
-cp -a platform-tools-sdk/sbf/* sbf-sdk/
+cp -a sbf/* sbf-sdk/
 
 tar jvcf sbf-sdk.tar.bz2 sbf-sdk/
+rm -rf sbf-sdk
