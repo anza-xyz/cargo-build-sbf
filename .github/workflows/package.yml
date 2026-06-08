@@ -1,0 +1,53 @@
+name: Release C SDK
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to package (default: from Cargo.toml)'
+        required: false
+        default: '4.1.0'
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run packaging script
+        run: |
+          ./scripts/package.sh
+
+      - name: Verify package exists
+        run: |
+          ls -la sbf-sdk.tar.bz2
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -z "${{ github.event.inputs.version }}" ]; then
+            VERSION=$(./scripts/crate-version.sh Cargo.toml)
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./sbf-sdk.tar.bz2
+          asset_name: sbf-sdk.tar.bz2
+          asset_content_type: application/x-tar
