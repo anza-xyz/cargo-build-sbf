@@ -1,11 +1,6 @@
 name: Release C SDK
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to package (default: from Cargo.toml)'
-        required: false
-        default: '4.1.0'
 
 jobs:
   package:
@@ -24,11 +19,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          if [ -z "${{ github.event.inputs.version }}" ]; then
-            VERSION=$(./scripts/crate-version.sh Cargo.toml)
-          else
-            VERSION="${{ github.event.inputs.version }}"
-          fi
+          VERSION=$(./scripts/crate-version.sh Cargo.toml)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Release
@@ -37,8 +28,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release v${{ steps.version.outputs.version }}
+          tag_name: sbf-sdk@v${{ steps.version.outputs.version }}
+          release_name: Release sbf-sdk@v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
 
