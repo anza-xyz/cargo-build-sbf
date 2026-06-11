@@ -2,11 +2,14 @@ name: Release C SDK
 on:
   workflow_dispatch:
 
+permissions:
+  packages: write
+
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run packaging script
         run: |
