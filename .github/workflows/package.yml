@@ -1,15 +1,82 @@
 name: Release C SDK
 on:
   workflow_dispatch:
-
-permissions:
-  packages: write
+    inputs:
+      ref:
+        description: "git ref to tag (can be a branch or a commit hash)"
+        required: true
+        default: "master"
+        type: string
 
 jobs:
-  package:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      ref: ${{ steps.meta.outputs.ref }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          VERSION=$(./scripts/crate-version.sh Cargo.toml)
+
+          tag="sbf-sdk@v${VERSION}"
+          ref="$(git rev-parse HEAD)"
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check tag does not exist
+        run: |
+          echo "checking: refs/tags/${TAG}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${TAG}. Please bump the version first (or delete the existing tag) and retry."
+            echo "Tag exists: ${TAG}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+
+      - name: Summary
+        run: |
+          echo "Tag: ${TAG}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Ref: ${REF} (https://github.com/${{ github.repository }}/commit/${REF})" >> "${GITHUB_STEP_SUMMARY}"
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          REF: ${{ steps.meta.outputs.ref }}
+
+  publish:
+    runs-on: ubuntu-latest
+    environment: prod
+    needs: check
+    steps:
+      - name: Create github app token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          client-id: ${{ vars.CLIENT_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Set git config
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf https://github.com/
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+          ref: ${{ needs.check.outputs.ref }}
 
       - name: Run packaging script
         run: |
@@ -19,29 +86,44 @@ jobs:
         run: |
           ls -la sbf-sdk.tar.bz2
 
-      - name: Get version
-        id: version
+      - name: Push tag
         run: |
-          VERSION=$(./scripts/crate-version.sh Cargo.toml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+        env:
+          TAG: ${{ needs.check.outputs.tag }}
 
       - name: Create Release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: sbf-sdk@v${{ steps.version.outputs.version }}
-          release_name: Release sbf-sdk@v${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: process.env.TAG,
+              name: `Release ${process.env.TAG}`,
+              generate_release_notes: true,
+              draft: false,
+              prerelease: false
+            })
+            return release.data.id
+        env:
+          TAG: ${{ needs.check.outputs.tag }}
 
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.create_release.outputs.result }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./sbf-sdk.tar.bz2
-          asset_name: sbf-sdk.tar.bz2
-          asset_content_type: application/x-tar
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fs = require('fs')
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: process.env.RELEASE_ID,
+              name: 'sbf-sdk.tar.bz2',
+              data: fs.readFileSync('./sbf-sdk.tar.bz2')
+            })
