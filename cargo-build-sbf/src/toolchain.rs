@@ -379,7 +379,7 @@ fn link_solana_toolchain(
     let requested_toolchain_name = generate_toolchain_name(requested_toolchain_version);
     let mut do_link = true;
     for line in rustup_output.lines() {
-        let substrings: Vec<&str> = line.split(' ').collect();
+        let substrings: Vec<&str> = line.split_ascii_whitespace().collect();
         let installed_toolchain_name = *substrings.first().unwrap();
         if installed_toolchain_name.contains("solana") {
             // Paths are always the last item in the output of 'rust toolchain list -v'
