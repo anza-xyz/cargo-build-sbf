@@ -274,7 +274,7 @@ fn build_solana(config: Config, manifest_path: Option<PathBuf>) {
 }
 
 fn main() {
-    agave_logger::setup();
+    agave_logger::setup_with_default("warn");
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
@@ -591,5 +591,19 @@ fn main() {
         return;
     }
 
+    let version_used = config.arch;
     build_solana(config, manifest_path);
+
+    if version_used != "v3" && version_used != "v4" {
+        warn!(
+            "SBPF version {version_used} is deprecated. New deployments will be blocked from \
+             Agave v4.2 onwards. Please, migrate your program to SBPFv3 by doing `cargo clean` \
+             and invoking `cargo-build-sbf --arch v3`. It requires platform tools v1.53 or newer."
+        );
+
+        warn!(
+            "cargo-build-sbf will emit SBPFv3 binaries by default starting on version v5.0, \
+             requiring platform tools v1.53 or newer."
+        );
+    }
 }
