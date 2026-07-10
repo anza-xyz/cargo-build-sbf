@@ -592,17 +592,21 @@ fn main() {
     }
 
     let version_used = config.arch;
+    let tools_version = config
+        .platform_tools_version
+        .unwrap_or(DEFAULT_PLATFORM_TOOLS_VERSION);
     build_solana(config, manifest_path);
 
     if version_used != "v3" && version_used != "v4" {
         warn!(
             "SBPF version {version_used} is deprecated. New deployments will be blocked from \
              Agave v4.2 onwards. Please, migrate your program to SBPFv3 by doing `cargo clean` \
-             and invoking `cargo-build-sbf --arch v3`. It requires platform tools v1.53 or newer."
+             and invoking `cargo-build-sbf --arch v3`. It requires platform tools v1.53 or newer. \
+             Your platform tools version is {tools_version}."
         );
 
         warn!(
-            "cargo-build-sbf will emit SBPFv3 binaries by default starting on version v5.0, \
+            "cargo-build-sbf will emit SBPFv3 binaries by default starting on version v4.3, \
              requiring platform tools v1.53 or newer."
         );
     }
