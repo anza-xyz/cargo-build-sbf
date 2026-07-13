@@ -26,8 +26,9 @@ fn main() {
         std::println!(
             "cargo:warning=Your cargo installation folder `~/.cargo/bin` appears to be after your \
              Solana installation folder `~/.local/share/solana/install/active_release/bin`. \
-             Unless such order is reversed, the Solana provided cargo-build-sbf will hide the new \
-             installation."
+             Update your PATH to place `~/.cargo/bin` before \
+             `~/.local/share/solana/install/active_release/bin`, or this installation won't be \
+             used."
         );
     }
 }
