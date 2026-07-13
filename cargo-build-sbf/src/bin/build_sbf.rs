@@ -5,7 +5,7 @@ use {
         toolchain::{
             DEFAULT_PLATFORM_TOOLS_VERSION, corrupted_toolchain, generate_toolchain_name,
             get_base_rust_version, install_and_link_tools, install_tools,
-            make_platform_tools_path_for_version, rust_target_triple,
+            make_platform_tools_path_for_version, rust_target_triple, semver_version,
             validate_platform_tools_version,
         },
         utils::{is_version_string, spawn},
@@ -595,6 +595,18 @@ fn main() {
     let tools_version = config
         .platform_tools_version
         .unwrap_or(DEFAULT_PLATFORM_TOOLS_VERSION);
+
+    if (version_used == "v3" || version_used == "v4")
+        && semver::Version::parse(&semver_version(tools_version)).unwrap()
+            < semver::Version::parse("1.53.0").unwrap()
+    {
+        error!(
+            "Your platform tools {tools_version} is incompatible with SBPF{version_used}. Use \
+             platform tools version v1.53 or newer to build programs for it."
+        );
+        exit(1);
+    }
+
     build_solana(config, manifest_path);
 
     if version_used != "v3" && version_used != "v4" {
