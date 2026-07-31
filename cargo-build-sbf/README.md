@@ -18,7 +18,7 @@ Inside a Solana Rust project folder, run `cargo-build-sbf`. The results will be 
 
 ## SBFPv3 migration
 
-Solana is deprecating SBPF versions v0, v1, and v2 in favor of SBPFv3 that enhances cluster security and improve 
+Solana is deprecating SBPF versions v0, v1, and v2 in favor of SBPFv3 that enhances cluster security and improves
 network performance.
 
 The deployment of SBPF versions v0, v1 and v2 is going to be blocked starting on Agave v4.2, so we are laying out a
