@@ -268,6 +268,30 @@ fn test_sbpfv3() {
 
 #[test]
 #[serial]
+fn test_regenerate_files() {
+    let assert_v1 = build_noop_and_readelf("v3", false);
+    assert_v1
+        .stdout(predicate::str::contains(
+            "Flags:                             0x3",
+        ))
+        .success();
+    let assert_v0 = build_noop_and_readelf("v0", false);
+    assert_v0
+        .stdout(predicate::str::contains(
+            "Flags:                             0x0",
+        ))
+        .success();
+    let assert_v1 = build_noop_and_readelf("v3", false);
+    assert_v1
+        .stdout(predicate::str::contains(
+            "Flags:                             0x3",
+        ))
+        .success();
+    clean_target("noop");
+}
+
+#[test]
+#[serial]
 #[ignore]
 fn test_sbpfv4() {
     let assert_v1 = build_noop_and_readelf("v4", false);
