@@ -237,8 +237,7 @@ pub fn post_process(
             )
         };
 
-        if config.dump && file_older_or_missing(&program_unstripped_so, &program_dump, config.arch)
-        {
+        if config.dump {
             let mangled_name = format!("{}.mangled", program_dump.display());
             {
                 let mangled =
@@ -272,17 +271,19 @@ pub fn post_process(
                 }
             }
 
-            let dump = File::create(&program_dump).expect("failed to open dump file");
-            let mut dump_out = BufWriter::new(dump);
-            let output = spawn(
-                Path::new("rustfilt"),
-                ["--input", mangled_name.as_str()],
-                config.generate_child_script_on_failure,
-            );
-            write!(dump_out, "{output}").expect("write output of rustfilt");
-            std::fs::remove_file(mangled_name).expect("mangled file to be removed");
+            {
+                let dump = File::create(&program_dump).expect("failed to open dump file");
+                let mut dump_out = BufWriter::new(dump);
+                let output = spawn(
+                    Path::new("rustfilt"),
+                    ["--input", mangled_name.as_str()],
+                    config.generate_child_script_on_failure,
+                );
+                write!(dump_out, "{output}").expect("write output of rustfilt");
+                std::fs::remove_file(mangled_name).expect("mangled file to be removed");
+                info!("Wrote {}", program_dump.display());
+            }
 
-            info!("Wrote {}", program_dump.display());
             postprocess_dump(&program_dump);
         }
 
