@@ -59,9 +59,8 @@ fn file_older_or_missing(
 
     // If the requested version is not the one we've saved, we must re-generated it.
     if let Some(sbpf_version) = sbpf_version {
-        match (sbpf_version, request_version) {
-            (0, "v0") | (1, "v1") | (2, "v2") | (3, "v3") | (4, "v4") => (),
-            _ => return true,
+        if format!("v{sbpf_version}") != request_version {
+            return true;
         }
     }
 
