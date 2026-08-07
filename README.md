@@ -19,11 +19,12 @@ C program for Solana. Its releases are independently posted on the GitHub releas
 
 ## SBFPv3 migration
 
-Solana is deprecating SBPF versions v0, v1, and v2 in favor of SBPFv3 that enhances cluster security and improves
-network performance.
-
-The deployment of SBPF versions v0, v1 and v2 is going to be blocked once SIMD-500 is activated. It is scheduled for
-activation in Agave v4.3.
+> [!IMPORTANT]  
+> Solana is deprecating SBPF versions v0, v1, and v2 in favor of SBPFv3 that enhances cluster security and improves
+> network performance.
+>
+> The deployment of SBPF versions v0, v1 and v2 is going to be blocked once SIMD-500 is activated. It is scheduled for
+> activation in Agave v4.3.
 
 The table below shows the minimum versions of each program component:
 
