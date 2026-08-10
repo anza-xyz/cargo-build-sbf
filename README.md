@@ -39,6 +39,19 @@ The table below shows the minimum versions of each program component:
 To build a program for SBPFv3, make sure you have the versions pointed above or newer, and run
 `cargo-build-sbf --arch v3`.
 
+SBPFv3 does not support undefined symbols. If any external or unresolved symbol is not resolved at link time,
+compilation will error like the following. An undefined symbol in SBPFv3 generates an instruction `call -1`, 
+resulting in an infinite loop and the `CallDepthExceeded` error during execution. Syscalls must follow the
+[static standard](https://github.com/anza-xyz/solana-sdk/blob/master/define-syscall/src/lib.rs).
+
+```
+error: linking with `rust-lld` failed: exit status: 1
+[..]
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: undefined symbol: sol_log_
+```
+
+
 To check the SBPF version your program was built for, run:
 
 ```
