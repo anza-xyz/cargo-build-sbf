@@ -104,6 +104,13 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         ));
     }
 
+    if config.arch == "v3" {
+        target_rustflags = Cow::Owned(format!(
+            "{} -C link-arg=-z -C link-arg=defs",
+            &target_rustflags,
+        ));
+    }
+
     if let Cow::Owned(flags) = target_rustflags {
         // Safety: cargo-build-sbf doesn't spawn any threads until final child process is spawned
         unsafe { env::set_var(&cargo_target, flags) }
