@@ -173,18 +173,17 @@ fn test_solana(config: Config, manifest_path: Option<PathBuf>) {
         exit(1);
     });
 
-    if let Some(root_package) = metadata.root_package() {
-        if !config.workspace
-            && (config.packages.is_empty()
-                || config
-                    .packages
-                    .iter()
-                    .any(|p| root_package.id.repr.contains(p)))
-        {
-            debug!("test root package {:?}", root_package.id);
-            test_solana_package(&config, metadata.target_directory.as_ref(), root_package);
-            return;
-        }
+    if let Some(root_package) = metadata.root_package()
+        && !config.workspace
+        && (config.packages.is_empty()
+            || config
+                .packages
+                .iter()
+                .any(|p| root_package.id.repr.contains(p)))
+    {
+        debug!("test root package {:?}", root_package.id);
+        test_solana_package(&config, metadata.target_directory.as_ref(), root_package);
+        return;
     }
 
     let all_sbf_packages = metadata
@@ -216,10 +215,10 @@ fn main() {
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
-    if let Some(arg1) = args.get(1) {
-        if arg1 == "test-sbf" {
-            args.remove(1);
-        }
+    if let Some(arg1) = args.get(1)
+        && arg1 == "test-sbf"
+    {
+        args.remove(1);
     }
 
     let em_dash = "--".to_string();

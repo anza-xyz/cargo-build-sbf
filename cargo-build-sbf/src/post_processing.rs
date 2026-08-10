@@ -58,10 +58,10 @@ fn file_older_or_missing(
     });
 
     // If the requested version is not the one we've saved, we must re-generated it.
-    if let Some(sbpf_version) = sbpf_version {
-        if format!("v{sbpf_version}") != request_version {
-            return true;
-        }
+    if let Some(sbpf_version) = sbpf_version
+        && format!("v{sbpf_version}") != request_version
+    {
+        return true;
     }
 
     if let Ok(target_metadata) = fs::metadata(target_file) {

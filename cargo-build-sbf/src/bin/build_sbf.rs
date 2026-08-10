@@ -225,22 +225,21 @@ fn build_solana(config: Config, manifest_path: Option<PathBuf>) {
         .clone()
         .unwrap_or(metadata.target_directory.clone());
 
-    if let Some(root_package) = metadata.root_package() {
-        if !config.workspace {
-            let program_name = generate_program_name(root_package);
-            let validated_toolchain_version =
-                prepare_environment(&config, Some(root_package), &metadata);
-            let platform_tools_dir =
-                make_platform_tools_path_for_version(&validated_toolchain_version);
-            invoke_cargo(&config, &platform_tools_dir, validated_toolchain_version);
-            post_process(
-                &config,
-                &platform_tools_dir,
-                target_dir.as_ref(),
-                program_name,
-            );
-            return;
-        }
+    if let Some(root_package) = metadata.root_package()
+        && !config.workspace
+    {
+        let program_name = generate_program_name(root_package);
+        let validated_toolchain_version =
+            prepare_environment(&config, Some(root_package), &metadata);
+        let platform_tools_dir = make_platform_tools_path_for_version(&validated_toolchain_version);
+        invoke_cargo(&config, &platform_tools_dir, validated_toolchain_version);
+        post_process(
+            &config,
+            &platform_tools_dir,
+            target_dir.as_ref(),
+            program_name,
+        );
+        return;
     }
 
     let validated_toolchain_version = prepare_environment(&config, None, &metadata);
@@ -278,10 +277,10 @@ fn main() {
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
-    if let Some(arg1) = args.get(1) {
-        if arg1 == "build-sbf" {
-            args.remove(1);
-        }
+    if let Some(arg1) = args.get(1)
+        && arg1 == "build-sbf"
+    {
+        args.remove(1);
     }
 
     // The following line is scanned by CI configuration script to
