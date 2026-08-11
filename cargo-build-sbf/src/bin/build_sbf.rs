@@ -104,7 +104,7 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         ));
     }
 
-    if config.arch == "v3" {
+    if config.arch == "v3" || config.arch == "v4" {
         target_rustflags = Cow::Owned(format!(
             "{} -C link-arg=-z -C link-arg=defs",
             &target_rustflags,
