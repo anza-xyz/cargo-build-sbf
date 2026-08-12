@@ -20,7 +20,7 @@ use {
     tar::Archive,
 };
 
-pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.54";
+pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.55";
 pub(crate) const DEFAULT_RUST_VERSION: &str = "1.89.0";
 
 // Common headers used for Github API.
