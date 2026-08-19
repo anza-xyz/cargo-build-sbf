@@ -17,6 +17,32 @@ cargo install cargo-build-sbf
 The C SDK consists of a tarball `sbf-sdk.tar.bz2` containing the necessary files to build a 
 C program for Solana. Its releases are independently posted on the GitHub releases page.
 
+## Platform Tools
+
+`cargo-build-sbf` ships with a default platform-tools, but it can be overriden.
+
+| cargo-build-sbf   | Default platform-tools | Default `--arch` |
+|-------------------|------------------------|------------------|
+| v4.0.0            | v1.53                  | v0               |
+| v4.1.0            | v1.54                  | v0               |
+
+You can override the platform-tools version on the command-line:
+
+```
+cargo build-sbf --tools-version v1.53
+```
+
+You can also pin it in the package manifest:
+
+```toml
+[package.metadata.solana]
+tools-version = "v1.53"
+```
+
+The same key works under `[workspace.metadata.solana]`. When both are set and
+disagree, the package value wins and a warning is emitted. `--tools-version`
+overrides both.
+
 ## SBFPv3 migration
 
 > [!IMPORTANT]  
