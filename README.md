@@ -19,12 +19,8 @@ C program for Solana. Its releases are independently posted on the GitHub releas
 
 ## Platform Tools
 
-`cargo-build-sbf` ships with a default platform-tools, but it can be overriden.
-
-| cargo-build-sbf   | Default platform-tools | Default `--arch` |
-|-------------------|------------------------|------------------|
-| v4.0.0            | v1.53                  | v0               |
-| v4.1.0            | v1.54                  | v0               |
+To see which version of platform-tools a given version of `cargo-build-sbf`
+uses by default, check out the release notes.
 
 You can override the platform-tools version on the command-line:
 
