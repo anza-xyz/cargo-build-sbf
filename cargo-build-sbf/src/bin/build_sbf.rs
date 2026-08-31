@@ -84,30 +84,27 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
     }
     let target_rustflags = env::var(&cargo_target).ok();
     let mut target_rustflags = Cow::Borrowed(target_rustflags.as_deref().unwrap_or_default());
-    target_rustflags = Cow::Owned(format!("{} {}", &rustflags, &target_rustflags));
+    target_rustflags = Cow::Owned(format!("{rustflags} {target_rustflags}"));
     if config.remap_cwd && !config.debug {
-        target_rustflags = Cow::Owned(format!("{} -Zremap-cwd-prefix=", &target_rustflags));
+        target_rustflags = Cow::Owned(format!("{target_rustflags} -Zremap-cwd-prefix="));
     }
     if config.optimize_size {
-        target_rustflags = Cow::Owned(format!("{} -C opt-level=s", &target_rustflags));
+        target_rustflags = Cow::Owned(format!("{target_rustflags} -C opt-level=s"));
     }
     if config.lto {
         target_rustflags = Cow::Owned(format!(
-            "{} -C embed-bitcode=yes -C lto=fat",
-            &target_rustflags
+            "{target_rustflags} -C embed-bitcode=yes -C lto=fat",
         ));
     }
     if let Some(stack_size) = config.sbf_stack_size {
         target_rustflags = Cow::Owned(format!(
-            "{} -C llvm-args=-sbf-stack-size={}",
-            &target_rustflags, stack_size
+            "{target_rustflags} -C llvm-args=-sbf-stack-size={stack_size}",
         ));
     }
 
     if config.arch == "v3" || config.arch == "v4" {
         target_rustflags = Cow::Owned(format!(
-            "{} -C link-arg=-z -C link-arg=defs",
-            &target_rustflags,
+            "{target_rustflags} -C link-arg=-z -C link-arg=defs",
         ));
     }
 
