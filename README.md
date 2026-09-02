@@ -50,16 +50,23 @@ overrides both.
 
 The table below shows the minimum versions of each program component:
 
-| Component                         | Minimum compatible version |
-|-----------------------------------|----------------------------|
-| Platform tools                    | v1.53                      |
-| cargo-build-sbf                   | v4.0.0                     |
-| Solana CLI                        | v4.0.0                     |
-| Solana SDK (define-syscall crate) | v2.3.0                     |
-| Pinocchio                         | v0.10                      |
+| Component                         | Minimum compatible version          |
+|-----------------------------------|-------------------------------------|
+| Platform tools                    | v1.53 (minimum), v1.56 (recomended) |
+| cargo-build-sbf                   | v4.2.0                              |
+| Solana CLI                        | v4.0.0                              |
+| Solana SDK (define-syscall crate) | v2.3.0                              |
+| Pinocchio                         | v0.10                               |
 
 To build a program for SBPFv3, make sure you have the versions pointed above or newer, and run
 `cargo-build-sbf --arch v3`.
+
+Platform tools v1.53 is the first one that contains SBPFv3, however, we recommend using v1.56 
+because it brings important bug fixes for all SBPF versions, while keeping the same Rust 1.89.0
+that ships with v1.53.
+
+If you are using an outdated version of cargo-build-sbf, try updating it by running 
+`cargo install cargo-build-sbf --force`.
 
 SBPFv3 does not support undefined symbols. If any external or unresolved symbol is not resolved at link time,
 compilation will error like the following. An undefined symbol in SBPFv3 generates an instruction `call -1`, 
