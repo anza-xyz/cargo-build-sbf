@@ -50,13 +50,13 @@ overrides both.
 
 The table below shows the minimum versions of each program component:
 
-| Component                         | Minimum compatible version          |
-|-----------------------------------|-------------------------------------|
-| Platform tools                    | v1.53 (minimum), v1.56 (recomended) |
-| cargo-build-sbf                   | v4.2.0                              |
-| Solana CLI                        | v4.0.0                              |
-| Solana SDK (define-syscall crate) | v2.3.0                              |
-| Pinocchio                         | v0.10                               |
+| Component                         | Minimum compatible version           |
+|-----------------------------------|--------------------------------------|
+| Platform tools                    | v1.53 (minimum), v1.56 (recommended) |
+| cargo-build-sbf                   | v4.2.0                               |
+| Solana CLI                        | v4.0.0                               |
+| Solana SDK (define-syscall crate) | v2.3.0                               |
+| Pinocchio                         | v0.10                                |
 
 To build a program for SBPFv3, make sure you have the versions pointed above or newer, and run
 `cargo-build-sbf --arch v3`.
