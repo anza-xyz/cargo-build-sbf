@@ -5,7 +5,7 @@ use {
         toolchain::{
             DEFAULT_PLATFORM_TOOLS_VERSION, corrupted_toolchain, generate_toolchain_name,
             get_base_rust_version, install_and_link_tools, install_tools,
-            make_platform_tools_path_for_version, rust_target_triple,
+            make_platform_tools_path_for_version, rust_target_triple, semver_version,
             validate_platform_tools_version,
         },
         utils::{is_version_string, spawn},
@@ -277,7 +277,7 @@ fn build_solana(config: Config, manifest_path: Option<PathBuf>) {
 }
 
 fn main() {
-    agave_logger::setup();
+    agave_logger::setup_with_default("warn");
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
@@ -455,7 +455,7 @@ fn main() {
             Arg::new("arch")
                 .long("arch")
                 .possible_values(["v0", "v1", "v2", "v3", "v4"])
-                .default_value("v0")
+                .default_value("v3")
                 .help("Build for the given target architecture"),
         )
         .arg(
@@ -577,6 +577,23 @@ fn main() {
         return;
     }
 
+    let tools_version = config
+        .platform_tools_version
+        .unwrap_or(DEFAULT_PLATFORM_TOOLS_VERSION);
+
+    let minimum_version = semver::Version::parse(&semver_version("v1.53")).unwrap();
+    let is_valid_version = semver::Version::parse(&semver_version(tools_version))
+        .ok()
+        .map(|version| version >= minimum_version || version.patch > 0);
+
+    if (config.arch == "v3" || config.arch == "v4") && is_valid_version == Some(false) {
+        error!("Platform tools {tools_version} is incompatible with SBPFv3. \
+        Refer to https://github.com/anza-xyz/cargo-build-sbf#sbfpv3-migration for more \
+        information. Run `cargo-build-sbf --arch v0` if you wish to use this platform tools \
+        version.");
+        return;
+    }
+
     let manifest_path: Option<PathBuf> = matches.value_of_t("manifest_path").ok();
     if config.verbose {
         debug!("{config:?}");
@@ -584,12 +601,8 @@ fn main() {
     }
 
     if config.install_only {
-        let platform_tools_version = validate_platform_tools_version(
-            config
-                .platform_tools_version
-                .unwrap_or(DEFAULT_PLATFORM_TOOLS_VERSION),
-            DEFAULT_PLATFORM_TOOLS_VERSION,
-        );
+        let platform_tools_version =
+            validate_platform_tools_version(tools_version, DEFAULT_PLATFORM_TOOLS_VERSION);
         install_tools(&config, &platform_tools_version, true);
         return;
     }

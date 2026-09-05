@@ -286,7 +286,7 @@ pub fn post_process(
             postprocess_dump(&program_dump);
         }
 
-        if config.arch != "v3" {
+        if config.arch != "v3" && config.arch != "v4" {
             // SBPFv3 shall not have any undefined syscall.
             check_undefined_symbols(config, platform_tools_dir, &program_so);
         }

@@ -78,7 +78,7 @@ fn downloadable_version(version: &str) -> String {
     }
 }
 
-fn semver_version(version: &str) -> String {
+pub fn semver_version(version: &str) -> String {
     let starts_with_v = version.starts_with('v');
     let dots = version.as_bytes().iter().fold(
         0,

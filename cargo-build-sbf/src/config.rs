@@ -50,7 +50,7 @@ impl Default for Config<'_> {
             quiet: false,
             workspace: false,
             jobs: None,
-            arch: "v0",
+            arch: "v3",
             optimize_size: false,
             lto: false,
             install_only: false,
