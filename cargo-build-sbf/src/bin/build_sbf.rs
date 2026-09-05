@@ -586,10 +586,7 @@ fn main() {
         .ok()
         .map(|version| version >= minimum_version || version.patch > 0);
 
-    if (config.arch == "v3" || config.arch == "v4")
-        && is_valid_version.is_some()
-        && !is_valid_version.unwrap()
-    {
+    if (config.arch == "v3" || config.arch == "v4") && is_valid_version == Some(false) {
         error!("Platform tools {tools_version} is incompatible with SBPFv3. \
         Refer to https://github.com/anza-xyz/cargo-build-sbf#sbfpv3-migration for more \
         information. Run `cargo-build-sbf --arch v0` if you wish to use this platform tools \
