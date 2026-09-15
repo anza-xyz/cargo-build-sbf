@@ -5,7 +5,7 @@ use {
         toolchain::{
             DEFAULT_PLATFORM_TOOLS_VERSION, corrupted_toolchain, generate_toolchain_name,
             get_base_rust_version, install_and_link_tools, install_tools,
-            make_platform_tools_path_for_version, rust_target_triple, semver_version,
+            make_platform_tools_path_for_version, rust_target_triple,
             validate_platform_tools_version,
         },
         utils::{is_version_string, spawn},
@@ -592,19 +592,6 @@ fn main() {
             validate_platform_tools_version(tools_version, DEFAULT_PLATFORM_TOOLS_VERSION);
         install_tools(&config, &platform_tools_version, true);
         return;
-    }
-
-    let minimum_version = semver::Version::parse(&semver_version("v1.53")).unwrap();
-    let is_valid_version = semver::Version::parse(&semver_version(tools_version))
-        .ok()
-        .map(|version| version >= minimum_version || version.patch > 0);
-
-    if (config.arch == "v3" || config.arch == "v4") && is_valid_version == Some(false) {
-        error!("Platform tools {tools_version} is incompatible with SBPF{}. \
-        Refer to https://github.com/anza-xyz/cargo-build-sbf#sbfpv3-migration for more \
-        information. Run `cargo-build-sbf --arch v0` if you wish to use this platform tools \
-        version.", config.arch);
-        exit(1);
     }
 
     build_solana(config, manifest_path);
