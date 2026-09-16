@@ -62,6 +62,12 @@ fn find_installed_platform_tools() -> Vec<String> {
     }
 }
 
+fn is_version_available(version: &str) -> Result<bool, String> {
+    let url = format!("https://github.com/anza-xyz/platform-tools/releases/{version}");
+    let resp = reqwest::blocking::get(&url).map_err(|err| format!("Failed to GET {url}: {err}"))?;
+    Ok(resp.status().as_u16() != 404)
+}
+
 fn get_latest_platform_tools_version() -> Result<String, String> {
     let url = "https://github.com/anza-xyz/platform-tools/releases/latest";
     let resp = reqwest::blocking::get(url).map_err(|err| format!("Failed to GET {url}: {err}"))?;
@@ -103,28 +109,31 @@ pub fn validate_platform_tools_version(requested_version: &str, builtin_version:
     let normalized_requested = semver_version(requested_version);
     let requested_semver = semver::Version::parse(&normalized_requested).unwrap();
     let installed_versions = find_installed_platform_tools();
+
+    let requested_downloadable_version = downloadable_version(requested_version);
     for v in installed_versions {
         if requested_semver <= semver::Version::parse(&semver_version(&v)).unwrap() {
-            return downloadable_version(requested_version);
+            return requested_downloadable_version;
         }
     }
-    let latest_version = get_latest_platform_tools_version().unwrap_or_else(|err| {
-        debug!(
-            "Can't get the latest version of platform-tools: {err}. Using built-in version \
-             {builtin_version}."
-        );
-        builtin_version.to_string()
-    });
-    let normalized_latest = semver_version(&latest_version);
-    let latest_semver = semver::Version::parse(&normalized_latest).unwrap();
-    if requested_semver <= latest_semver {
-        downloadable_version(requested_version)
-    } else {
-        warn!(
-            "Version {requested_version} is not valid, latest version is {latest_version}. Using \
-             the built-in version {builtin_version}"
-        );
-        builtin_version.to_string()
+
+
+    match is_version_available(&requested_downloadable_version) {
+        Ok(true) => requested_downloadable_version,
+        Ok(false) => {
+            error!("Platform tools version {requested_version} does not exist.");
+            if let Ok(newest) = get_latest_platform_tools_version() {
+                warn!("Version {newest} is marked as the latest on Github.");
+            }
+            exit(1)
+        }
+        Err(err) => {
+            warn!(
+                "Can't get the version of platform-tools: {err}. Using built-in version \
+                 {builtin_version}."
+            );
+            builtin_version.to_string()
+        }
     }
 }
 
