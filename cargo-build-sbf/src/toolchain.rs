@@ -117,7 +117,6 @@ pub fn validate_platform_tools_version(requested_version: &str, builtin_version:
         }
     }
 
-
     match is_version_available(&requested_downloadable_version) {
         Ok(true) => requested_downloadable_version,
         Ok(false) => {
