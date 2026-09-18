@@ -97,3 +97,14 @@ On MacOS, `binutils` is available at `/opt/homebrew/opt/binutils/bin/readelf` af
 
 Keep an eye on this page, as we may bring SBPFv3 compatibility to more versions of such components to ensure a
 smooth migration.
+
+## ALU32 (unstable)
+
+The SBPF target supports the ALU32 feature. It enables 32-bit arithmetic operations in SBF, without requiring 
+software emulation using 64-bit operands.
+
+Programs can be built with such a feature by running `RUSTFLAGS= -C target-feature=+alu32 cargo-build-sbf`. 
+
+The feature, however, is unstable for all SBPF versions, except SBPFv2, even though the compiler might not warn 
+about its instability. We do not recommend its usage, because internal benchmarks showed it produces larger programs
+that consume more CUs than their counterparts built without ALU32 instructions.
