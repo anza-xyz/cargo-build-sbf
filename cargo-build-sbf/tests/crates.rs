@@ -1,5 +1,6 @@
 use {
     assert_cmd::{assert::Assert, cargo::cargo_bin_cmd},
+    cargo_build_sbf::toolchain::{DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION},
     predicates::prelude::*,
     std::{env, fs, path::PathBuf, str::FromStr},
 };
@@ -426,4 +427,16 @@ fn test_binaries_work() {
             .assert()
             .success();
     }
+}
+
+#[test]
+fn test_version() {
+    cargo_bin_cmd!("cargo-build-sbf")
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!(
+            "Default platform-tools: {DEFAULT_PLATFORM_TOOLS_VERSION}\nDefault Rust: \
+             {DEFAULT_RUST_VERSION}\n"
+        )));
 }
