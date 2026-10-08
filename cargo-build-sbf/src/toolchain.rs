@@ -1,7 +1,7 @@
 use {
     crate::{
         config::Config,
-        utils::{home_dir, spawn},
+        utils::{platform_tools_cache_dir, spawn},
     },
     bzip2::bufread::BzDecoder,
     log::{debug, error, info, warn},
@@ -42,7 +42,7 @@ const GITHUB_API_BYTES_RESPONSE_HEADERS: [(&str, &str); 3] = [
 ];
 
 fn find_installed_platform_tools() -> Vec<String> {
-    let solana = home_dir().join(".cache").join("solana");
+    let solana = platform_tools_cache_dir();
     let package = "platform-tools";
 
     if let Ok(dir) = std::fs::read_dir(solana) {
@@ -137,9 +137,7 @@ pub fn validate_platform_tools_version(requested_version: &str, builtin_version:
 }
 
 pub fn make_platform_tools_path_for_version(version: &str) -> PathBuf {
-    home_dir()
-        .join(".cache")
-        .join("solana")
+    platform_tools_cache_dir()
         .join(version)
         .join("platform-tools")
 }

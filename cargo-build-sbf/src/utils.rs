@@ -5,7 +5,7 @@ use {
     solana_keypair::{Keypair, write_keypair_file},
     std::{
         env,
-        ffi::OsStr,
+        ffi::{OsStr, OsString},
         fs::File,
         io::{BufWriter, Write},
         path::{Path, PathBuf},
@@ -109,6 +109,16 @@ pub fn home_dir() -> PathBuf {
     )
 }
 
+fn platform_tools_cache_dir_from(override_dir: Option<OsString>) -> PathBuf {
+    override_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".cache").join("solana"))
+}
+
+pub fn platform_tools_cache_dir() -> PathBuf {
+    platform_tools_cache_dir_from(env::var_os("SOLANA_PLATFORM_TOOLS_DIR"))
+}
+
 pub fn is_version_string(arg: &str) -> Result<(), String> {
     let semver_re = Regex::new(r"^v?[0-9]+\.[0-9]+(\.[0-9]+)?$").unwrap();
     if semver_re.is_match(arg) {
@@ -165,5 +175,14 @@ mod tests {
         assert!(error_msg.contains("version string may start with 'v'"));
         assert!(error_msg.contains("major and minor version numbers"));
         assert!(error_msg.contains("separated by a dot"));
+    }
+
+    #[test]
+    fn test_platform_tools_cache_dir_override() {
+        // An explicit directory wins over the default ~/.cache/solana
+        assert_eq!(
+            platform_tools_cache_dir_from(Some("/custom/tools".into())),
+            PathBuf::from("/custom/tools")
+        );
     }
 }

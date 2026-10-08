@@ -39,6 +39,14 @@ The same key works under `[workspace.metadata.solana]`. When both are set and
 disagree, the package value wins and a warning is emitted. `--tools-version`
 overrides both.
 
+Platform-tools are cached under `$HOME/.cache/solana`. Set
+`SOLANA_PLATFORM_TOOLS_DIR` to use a fixed directory instead, for example to
+share a pre-provisioned toolchain across CI jobs or in a read-only home:
+
+```
+export SOLANA_PLATFORM_TOOLS_DIR=/opt/solana-platform-tools
+```
+
 ## SBFPv3 migration
 
 > [!IMPORTANT]  
