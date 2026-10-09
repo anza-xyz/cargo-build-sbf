@@ -246,6 +246,7 @@ dependencies = [
  "bzip2",
  "cargo_metadata",
  "clap",
+ "indicatif",
  "itertools",
  "log",
  "predicates",

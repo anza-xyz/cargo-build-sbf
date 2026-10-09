@@ -39,6 +39,7 @@ agave-logger = { version = "4.0.3", features = ["agave-unstable-api"] }
 assert_cmd = "2.2.2"
 bzip2 = "0.6.1"
 cargo_metadata = "0.15.4"
+indicatif = "0.18.4"
 itertools = "0.15.0"
 log = "0.4.30"
 predicates = "3.1"
