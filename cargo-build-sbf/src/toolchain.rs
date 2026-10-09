@@ -263,12 +263,14 @@ fn unpack_platform_tools(archive_path: &Path, target_path: &Path) -> Result<(), 
         .map_err(|err| format!("could not unpack downloaded archive: {err}"))
 }
 
+// Check whether a package is installed and install it if missing. Returns
+// whether a fresh installation was performed.
 pub(crate) fn install_if_missing(
     config: &Config,
     platform_tools_version: &str,
     target_path: &Path,
     use_rest_api: bool,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     if config.force_tools_install && target_path.is_dir() {
         debug!("Remove directory {target_path:?}");
         fs::remove_dir_all(target_path)
@@ -292,12 +294,12 @@ pub(crate) fn install_if_missing(
 
     // Check whether the package is already in ~/.cache/solana.
     // Download it and place in the proper location if not found.
-    if !target_path.is_dir()
+    let needs_install = !target_path.is_dir()
         && !target_path
             .symlink_metadata()
             .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false)
-    {
+            .unwrap_or(false);
+    if needs_install {
         if target_path.exists() {
             debug!("Remove file {target_path:?}");
             fs::remove_file(target_path)
@@ -347,7 +349,7 @@ pub(crate) fn install_if_missing(
             target_path.display()
         );
     }
-    Ok(())
+    Ok(needs_install)
 }
 
 // Check if we have all binaries in place to execute the build command.
@@ -445,7 +447,9 @@ fn link_solana_toolchain(
     }
 }
 
-pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) {
+/// Installs platform-tools if missing. Returns whether a fresh installation was
+/// performed.
+pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) -> bool {
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
     install_if_missing(config, platform_tools_version, &target_path, use_rest_api).unwrap_or_else(
         |err| {
@@ -465,7 +469,7 @@ pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api
             error!("Failed to install platform-tools: {err}");
             exit(1);
         },
-    );
+    )
 }
 
 pub fn install_and_link_tools(
