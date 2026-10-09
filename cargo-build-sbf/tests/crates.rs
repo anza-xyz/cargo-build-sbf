@@ -194,6 +194,18 @@ fn test_generate_child_script_on_failure() {
     clean_target("fail");
 }
 
+#[test]
+#[serial]
+fn test_allow_unresolved_symbols() {
+    run_cargo_build("undefined-symbol", &["--arch", "v3"], true);
+    run_cargo_build(
+        "undefined-symbol",
+        &["--arch", "v3", "--allow-unresolved-symbols"],
+        false,
+    );
+    clean_target("undefined-symbol");
+}
+
 fn build_noop_and_readelf(arch: &str, patch: bool) -> Assert {
     let mut extra_args = vec!["--arch", arch];
     if patch {

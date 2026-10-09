@@ -102,7 +102,7 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         ));
     }
 
-    if config.arch == "v3" || config.arch == "v4" {
+    if (config.arch == "v3" || config.arch == "v4") && !config.allow_unresolved_symbols {
         target_rustflags = Cow::Owned(format!(
             "{target_rustflags} -C link-arg=-z -C link-arg=defs",
         ));
@@ -495,6 +495,16 @@ fn main() {
             "Compile program for ABIv2. This is still an experimental features and only works \
              with `--arch v3`",
         ))
+        .arg(
+            Arg::new("allow_unresolved_symbols")
+                .long("allow-unresolved-symbols")
+                .takes_value(false)
+                .help(
+                    "Allow undefined symbols at link time for `--arch v3` and `--arch v4`, which \
+                     reject them by default. A call to an undefined symbol fails at runtime with \
+                     `CallDepthExceeded`.",
+                ),
+        )
         .get_matches_from(args);
 
     if matches.is_present("sbf_sdk") {
@@ -570,6 +580,7 @@ fn main() {
             .is_present("patch_binaries_for_nix")
             .then(|| matches.value_of_t("patch_binaries_for_nix").unwrap()),
         use_abi_v2: matches.is_present("abi_v2"),
+        allow_unresolved_symbols: matches.is_present("allow_unresolved_symbols"),
     };
 
     if config.use_abi_v2 && config.arch != "v3" {

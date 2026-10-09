@@ -80,6 +80,10 @@ error: linking with `rust-lld` failed: exit status: 1
   = note: rust-lld: error: undefined symbol: sol_log_
 ```
 
+To build anyway, pass `--allow-unresolved-symbols`. This is useful when, for
+example, a program deployed in tests calls a syscall the test environment
+doesn't provide. Any call to an unresolved symbol still fails at runtime.
+
 
 To check the SBPF version your program was built for, run:
 

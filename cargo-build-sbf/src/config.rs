@@ -27,6 +27,7 @@ pub struct Config<'a> {
     pub patch_binaries_for_nix: Option<bool>,
     pub use_abi_v2: bool,
     pub sbf_stack_size: Option<u32>,
+    pub allow_unresolved_symbols: bool,
 }
 
 impl Default for Config<'_> {
@@ -57,6 +58,7 @@ impl Default for Config<'_> {
             patch_binaries_for_nix: None,
             use_abi_v2: false,
             sbf_stack_size: None,
+            allow_unresolved_symbols: false,
         }
     }
 }
