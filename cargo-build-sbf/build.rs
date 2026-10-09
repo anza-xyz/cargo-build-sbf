@@ -22,13 +22,27 @@ fn main() {
         return;
     };
 
-    if solana_index < cargo_index {
+    if solana_index > cargo_index {
+        return;
+    }
+
+    if solana_bin.join("cargo-build-sbf").is_file() {
         std::println!(
-            "cargo:warning=Your cargo installation folder `~/.cargo/bin` appears to be after your \
-             Solana installation folder `~/.local/share/solana/install/active_release/bin`. \
-             Update your PATH to place `~/.cargo/bin` before \
-             `~/.local/share/solana/install/active_release/bin`, or this installation won't be \
-             used."
+            "cargo:warning=The Solana CLI's `cargo-build-sbf` in \
+             `~/.local/share/solana/install/active_release/bin` comes before `~/.cargo/bin` in \
+             your PATH, so `cargo build-sbf` will run it instead of this installation. Remove \
+             `~/.local/share/solana/install/active_release/bin/cargo-build-sbf`, or update your \
+             PATH to place `~/.cargo/bin` before \
+             `~/.local/share/solana/install/active_release/bin`."
+        );
+    } else {
+        std::println!(
+            "cargo:warning=Your Solana installation folder \
+             `~/.local/share/solana/install/active_release/bin` comes before `~/.cargo/bin` in \
+             your PATH. If a Solana CLI install or update adds a `cargo-build-sbf` there, `cargo \
+             build-sbf` will run it instead of this installation. Update your PATH to place \
+             `~/.cargo/bin` before `~/.local/share/solana/install/active_release/bin` to avoid \
+             this."
         );
     }
 }
