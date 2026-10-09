@@ -4,6 +4,7 @@ use {
         utils::{home_dir, spawn},
     },
     bzip2::bufread::BzDecoder,
+    indicatif::{ProgressBar, ProgressFinish, ProgressStyle},
     log::{debug, error, info, warn},
     regex::Regex,
     serde::{Deserialize, Serialize},
@@ -246,7 +247,22 @@ fn download_platform_tools(
     }
 }
 
-// Check whether a package is installed and install it if missing.
+fn unpack_platform_tools(archive_path: &Path, target_path: &Path) -> Result<(), String> {
+    let archive = File::open(archive_path).map_err(|err| err.to_string())?;
+    let archive_size = archive.metadata().map_err(|err| err.to_string())?.len();
+    let style = ProgressStyle::default_bar()
+        .template("{spinner:.green} Extracting [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+        .map_err(|err| err.to_string())?
+        .progress_chars("=> ");
+    let progress_bar = ProgressBar::new(archive_size)
+        .with_style(style)
+        .with_finish(ProgressFinish::AndClear);
+    let tar = BzDecoder::new(BufReader::new(progress_bar.wrap_read(archive)));
+    Archive::new(tar)
+        .unpack(target_path)
+        .map_err(|err| format!("could not unpack downloaded archive: {err}"))
+}
+
 pub(crate) fn install_if_missing(
     config: &Config,
     platform_tools_version: &str,
@@ -309,18 +325,14 @@ pub(crate) fn install_if_missing(
                 .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
         }
 
+        eprintln!("Downloading platform-tools {platform_tools_version}");
         download_platform_tools(
             &platform_tools_download_file_name,
             platform_tools_version,
             &download_file_path,
             use_rest_api,
         )?;
-        let zip = File::open(&download_file_path).map_err(|err| err.to_string())?;
-        let tar = BzDecoder::new(BufReader::new(zip));
-        let mut archive = Archive::new(tar);
-        archive
-            .unpack(target_path)
-            .map_err(|err| format!("could not unpack downloaded archive: {err}"))?;
+        unpack_platform_tools(&download_file_path, target_path)?;
         fs::remove_file(download_file_path)
             .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
         if should_nix_patch_bins_and_dylibs(config)
@@ -330,6 +342,10 @@ pub(crate) fn install_if_missing(
                 "patching for nix failed ({e};) will continue, but tools might not work out-of-box"
             )
         }
+        eprintln!(
+            "Installed platform-tools {platform_tools_version} at {}",
+            target_path.display()
+        );
     }
     Ok(())
 }
