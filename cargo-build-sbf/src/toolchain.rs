@@ -294,62 +294,62 @@ pub(crate) fn install_if_missing(
 
     // Check whether the package is already in ~/.cache/solana.
     // Download it and place in the proper location if not found.
-    let needs_install = !target_path.is_dir()
-        && !target_path
+    if target_path.is_dir()
+        || target_path
             .symlink_metadata()
             .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false);
-    if needs_install {
-        if target_path.exists() {
-            debug!("Remove file {target_path:?}");
-            fs::remove_file(target_path)
-                .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
-        }
-
-        fs::create_dir_all(target_path)
-            .map_err(|err| format!("could not create {target_path:?}: {err}"))?;
-        let arch = if cfg!(target_arch = "aarch64") {
-            "aarch64"
-        } else {
-            "x86_64"
-        };
-        let platform_tools_download_file_name = if cfg!(target_os = "windows") {
-            format!("platform-tools-windows-{arch}.tar.bz2")
-        } else if cfg!(target_os = "macos") {
-            format!("platform-tools-osx-{arch}.tar.bz2")
-        } else {
-            format!("platform-tools-linux-{arch}.tar.bz2")
-        };
-
-        let download_file_path = target_path.join(&platform_tools_download_file_name);
-        if download_file_path.exists() {
-            fs::remove_file(&download_file_path)
-                .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
-        }
-
-        eprintln!("Downloading platform-tools {platform_tools_version}");
-        download_platform_tools(
-            &platform_tools_download_file_name,
-            platform_tools_version,
-            &download_file_path,
-            use_rest_api,
-        )?;
-        unpack_platform_tools(&download_file_path, target_path)?;
-        fs::remove_file(download_file_path)
-            .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
-        if should_nix_patch_bins_and_dylibs(config)
-            && let Err(e) = nix_patch_all_bins_and_dylibs(target_path)
-        {
-            error!(
-                "patching for nix failed ({e};) will continue, but tools might not work out-of-box"
-            )
-        }
-        eprintln!(
-            "Installed platform-tools {platform_tools_version} at {}",
-            target_path.display()
-        );
+            .unwrap_or(false)
+    {
+        return Ok(false);
     }
-    Ok(needs_install)
+
+    if target_path.exists() {
+        debug!("Remove file {target_path:?}");
+        fs::remove_file(target_path)
+            .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
+    }
+
+    fs::create_dir_all(target_path)
+        .map_err(|err| format!("could not create {target_path:?}: {err}"))?;
+    let arch = if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x86_64"
+    };
+    let platform_tools_download_file_name = if cfg!(target_os = "windows") {
+        format!("platform-tools-windows-{arch}.tar.bz2")
+    } else if cfg!(target_os = "macos") {
+        format!("platform-tools-osx-{arch}.tar.bz2")
+    } else {
+        format!("platform-tools-linux-{arch}.tar.bz2")
+    };
+
+    let download_file_path = target_path.join(&platform_tools_download_file_name);
+    if download_file_path.exists() {
+        fs::remove_file(&download_file_path)
+            .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
+    }
+
+    eprintln!("Downloading platform-tools {platform_tools_version}");
+    download_platform_tools(
+        &platform_tools_download_file_name,
+        platform_tools_version,
+        &download_file_path,
+        use_rest_api,
+    )?;
+    unpack_platform_tools(&download_file_path, target_path)?;
+    fs::remove_file(download_file_path)
+        .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
+    if should_nix_patch_bins_and_dylibs(config)
+        && let Err(e) = nix_patch_all_bins_and_dylibs(target_path)
+    {
+        error!("patching for nix failed ({e};) will continue, but tools might not work out-of-box")
+    }
+    eprintln!(
+        "Installed platform-tools {platform_tools_version} at {}",
+        target_path.display()
+    );
+    Ok(true)
 }
 
 // Check if we have all binaries in place to execute the build command.
