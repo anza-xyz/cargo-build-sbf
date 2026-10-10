@@ -3,8 +3,8 @@ use {
         config::Config,
         post_processing::post_process,
         toolchain::{
-            DEFAULT_PLATFORM_TOOLS_VERSION, corrupted_toolchain, generate_toolchain_name,
-            get_base_rust_version, install_and_link_tools, install_tools,
+            DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION, corrupted_toolchain,
+            generate_toolchain_name, install_and_link_tools, install_tools,
             make_platform_tools_path_for_version, rust_target_triple,
             validate_platform_tools_version,
         },
@@ -287,14 +287,12 @@ fn main() {
         args.remove(1);
     }
 
-    // The following line is scanned by CI configuration script to
+    // The platform-tools line is scanned by CI configuration scripts to
     // separate cargo caches according to the version of platform-tools.
-    let rust_base_version = get_base_rust_version(DEFAULT_PLATFORM_TOOLS_VERSION);
     let version = format!(
-        "{}\nplatform-tools {}\n{}",
+        "{}\nDefault platform-tools: {DEFAULT_PLATFORM_TOOLS_VERSION}\nDefault Rust: \
+         {DEFAULT_RUST_VERSION}",
         crate_version!(),
-        DEFAULT_PLATFORM_TOOLS_VERSION,
-        rust_base_version,
     );
     let matches = clap::Command::new(crate_name!())
         .about(crate_description!())

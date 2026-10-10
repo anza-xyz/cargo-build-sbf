@@ -20,7 +20,8 @@ C program for Solana. Its releases are independently posted on the GitHub releas
 ## Platform Tools
 
 To see which version of platform-tools a given version of `cargo-build-sbf`
-uses by default, check out the release notes.
+uses by default, run `cargo build-sbf --version` or check out the release
+notes.
 
 You can override the platform-tools version on the command-line:
 
