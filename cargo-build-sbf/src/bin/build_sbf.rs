@@ -590,7 +590,13 @@ fn main() {
     if config.install_only {
         let platform_tools_version =
             validate_platform_tools_version(tools_version, DEFAULT_PLATFORM_TOOLS_VERSION);
-        install_tools(&config, &platform_tools_version, true);
+        if !install_tools(&config, &platform_tools_version, true) {
+            eprintln!(
+                "platform-tools {platform_tools_version} is already installed at {}. Use \
+                 --force-tools-install to reinstall.",
+                make_platform_tools_path_for_version(&platform_tools_version).display()
+            );
+        }
         return;
     }
 

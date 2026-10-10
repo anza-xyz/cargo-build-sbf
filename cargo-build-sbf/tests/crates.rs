@@ -1,5 +1,6 @@
 use {
     assert_cmd::{assert::Assert, cargo::cargo_bin_cmd},
+    cargo_build_sbf::toolchain::DEFAULT_PLATFORM_TOOLS_VERSION,
     predicates::prelude::*,
     std::{env, fs, path::PathBuf, str::FromStr},
 };
@@ -397,6 +398,19 @@ fn test_alternate_download() {
         .unwrap();
 
     assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains(&format!(
+        "Installed platform-tools {DEFAULT_PLATFORM_TOOLS_VERSION} at {}",
+        platform_tools_path().display()
+    )));
+
+    cargo_bin_cmd!("cargo-build-sbf")
+        .arg("--install-only")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(format!(
+            "platform-tools {DEFAULT_PLATFORM_TOOLS_VERSION} is already installed at {}",
+            platform_tools_path().display()
+        )));
 
     build_noop_and_readelf("v0", false);
 }

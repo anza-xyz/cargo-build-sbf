@@ -4,6 +4,7 @@ use {
         utils::{platform_tools_cache_dir, spawn},
     },
     bzip2::bufread::BzDecoder,
+    indicatif::{ProgressBar, ProgressFinish, ProgressStyle},
     log::{debug, error, info, warn},
     regex::Regex,
     serde::{Deserialize, Serialize},
@@ -244,13 +245,30 @@ fn download_platform_tools(
     }
 }
 
-// Check whether a package is installed and install it if missing.
+fn unpack_platform_tools(archive_path: &Path, target_path: &Path) -> Result<(), String> {
+    let archive = File::open(archive_path).map_err(|err| err.to_string())?;
+    let archive_size = archive.metadata().map_err(|err| err.to_string())?.len();
+    let style = ProgressStyle::default_bar()
+        .template("{spinner:.green} Extracting [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+        .map_err(|err| err.to_string())?
+        .progress_chars("=> ");
+    let progress_bar = ProgressBar::new(archive_size)
+        .with_style(style)
+        .with_finish(ProgressFinish::AndClear);
+    let tar = BzDecoder::new(BufReader::new(progress_bar.wrap_read(archive)));
+    Archive::new(tar)
+        .unpack(target_path)
+        .map_err(|err| format!("could not unpack downloaded archive: {err}"))
+}
+
+// Check whether a package is installed and install it if missing. Returns
+// whether a fresh installation was performed.
 pub(crate) fn install_if_missing(
     config: &Config,
     platform_tools_version: &str,
     target_path: &Path,
     use_rest_api: bool,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     if config.force_tools_install && target_path.is_dir() {
         debug!("Remove directory {target_path:?}");
         fs::remove_dir_all(target_path)
@@ -274,62 +292,62 @@ pub(crate) fn install_if_missing(
 
     // Check whether the package is already in ~/.cache/solana.
     // Download it and place in the proper location if not found.
-    if !target_path.is_dir()
-        && !target_path
+    if target_path.is_dir()
+        || target_path
             .symlink_metadata()
             .map(|metadata| metadata.file_type().is_symlink())
             .unwrap_or(false)
     {
-        if target_path.exists() {
-            debug!("Remove file {target_path:?}");
-            fs::remove_file(target_path)
-                .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
-        }
-
-        fs::create_dir_all(target_path)
-            .map_err(|err| format!("could not create {target_path:?}: {err}"))?;
-        let arch = if cfg!(target_arch = "aarch64") {
-            "aarch64"
-        } else {
-            "x86_64"
-        };
-        let platform_tools_download_file_name = if cfg!(target_os = "windows") {
-            format!("platform-tools-windows-{arch}.tar.bz2")
-        } else if cfg!(target_os = "macos") {
-            format!("platform-tools-osx-{arch}.tar.bz2")
-        } else {
-            format!("platform-tools-linux-{arch}.tar.bz2")
-        };
-
-        let download_file_path = target_path.join(&platform_tools_download_file_name);
-        if download_file_path.exists() {
-            fs::remove_file(&download_file_path)
-                .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
-        }
-
-        download_platform_tools(
-            &platform_tools_download_file_name,
-            platform_tools_version,
-            &download_file_path,
-            use_rest_api,
-        )?;
-        let zip = File::open(&download_file_path).map_err(|err| err.to_string())?;
-        let tar = BzDecoder::new(BufReader::new(zip));
-        let mut archive = Archive::new(tar);
-        archive
-            .unpack(target_path)
-            .map_err(|err| format!("could not unpack downloaded archive: {err}"))?;
-        fs::remove_file(download_file_path)
-            .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
-        if should_nix_patch_bins_and_dylibs(config)
-            && let Err(e) = nix_patch_all_bins_and_dylibs(target_path)
-        {
-            error!(
-                "patching for nix failed ({e};) will continue, but tools might not work out-of-box"
-            )
-        }
+        return Ok(false);
     }
-    Ok(())
+
+    if target_path.exists() {
+        debug!("Remove file {target_path:?}");
+        fs::remove_file(target_path)
+            .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
+    }
+
+    fs::create_dir_all(target_path)
+        .map_err(|err| format!("could not create {target_path:?}: {err}"))?;
+    let arch = if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        "x86_64"
+    };
+    let platform_tools_download_file_name = if cfg!(target_os = "windows") {
+        format!("platform-tools-windows-{arch}.tar.bz2")
+    } else if cfg!(target_os = "macos") {
+        format!("platform-tools-osx-{arch}.tar.bz2")
+    } else {
+        format!("platform-tools-linux-{arch}.tar.bz2")
+    };
+
+    let download_file_path = target_path.join(&platform_tools_download_file_name);
+    if download_file_path.exists() {
+        fs::remove_file(&download_file_path)
+            .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
+    }
+
+    eprintln!("Downloading platform-tools {platform_tools_version}");
+    download_platform_tools(
+        &platform_tools_download_file_name,
+        platform_tools_version,
+        &download_file_path,
+        use_rest_api,
+    )?;
+    unpack_platform_tools(&download_file_path, target_path)?;
+    fs::remove_file(download_file_path)
+        .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
+    if should_nix_patch_bins_and_dylibs(config)
+        && let Err(e) = nix_patch_all_bins_and_dylibs(target_path)
+    {
+        error!("patching for nix failed ({e};) will continue, but tools might not work out-of-box")
+    }
+    eprintln!(
+        "Installed platform-tools {platform_tools_version} at {}",
+        target_path.display()
+    );
+    Ok(true)
 }
 
 // Check if we have all binaries in place to execute the build command.
@@ -427,7 +445,9 @@ fn link_solana_toolchain(
     }
 }
 
-pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) {
+/// Installs platform-tools if missing. Returns whether a fresh installation was
+/// performed.
+pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api: bool) -> bool {
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
     install_if_missing(config, platform_tools_version, &target_path, use_rest_api).unwrap_or_else(
         |err| {
@@ -447,7 +467,7 @@ pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api
             error!("Failed to install platform-tools: {err}");
             exit(1);
         },
-    );
+    )
 }
 
 pub fn install_and_link_tools(
