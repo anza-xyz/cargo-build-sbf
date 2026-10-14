@@ -98,18 +98,34 @@ fn run_cargo_build(crate_name: &str, extra_args: &[&str], fail: bool) {
 
 fn clean_target(crate_name: &str) {
     let cwd = env::current_dir().expect("Unable to get current working directory");
-    let target = cwd
+    let crate_dir = cwd
         .join("tests")
         .join("crates")
-        .join(crate_name)
-        .join("target");
+        .join(crate_name);
+    let target = crate_dir.join("target");
     fs::remove_dir_all(target).expect("Failed to remove target dir");
+    let keypair = crate_dir.join(format!("{crate_name}-keypair.json"));
+    if keypair.exists() {
+        fs::remove_file(keypair).expect("Failed to remove root keypair");
+    }
 }
 
 #[test]
 #[serial]
 fn test_build() {
     run_cargo_build("noop", &[], false);
+    let cwd = env::current_dir().expect("Unable to get current working directory");
+    let crate_dir = cwd.join("tests").join("crates").join("noop");
+    let root_keypair = crate_dir.join("noop-keypair.json");
+    let deploy_keypair = crate_dir
+        .join("target")
+        .join("deploy")
+        .join("noop-keypair.json");
+    assert!(root_keypair.is_file());
+    assert_eq!(
+        fs::canonicalize(deploy_keypair).unwrap(),
+        fs::canonicalize(root_keypair).unwrap()
+    );
     clean_target("noop");
 }
 

@@ -14,5 +14,6 @@ cargo install cargo-build-sbf
 
 ## Usage
 
-Inside a Solana Rust project folder, run `cargo-build-sbf`. The results will be saved to `target/deploy`.
-
+Inside a Solana Rust project folder, run `cargo-build-sbf`. The program binary will be saved to
+`target/deploy`. The program keypair is stored in the project root, with a symlink to it in
+`target/deploy`.
