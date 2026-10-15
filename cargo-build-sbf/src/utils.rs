@@ -13,6 +13,8 @@ use {
     },
 };
 
+pub mod solana_cli;
+
 pub fn spawn<I, S>(program: &Path, args: I, generate_child_script_on_failure: bool) -> String
 where
     I: IntoIterator<Item = S>,

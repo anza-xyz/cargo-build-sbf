@@ -1,5 +1,7 @@
 use {
-    cargo_build_sbf::utils::{is_version_string, spawn},
+    cargo_build_sbf::utils::{
+        is_version_string, solana_cli::warn_if_installed_with_solana_cli, spawn,
+    },
     clap::{Arg, crate_description, crate_name, crate_version},
     log::*,
     std::{
@@ -212,6 +214,7 @@ fn test_solana(config: Config, manifest_path: Option<PathBuf>) {
 
 fn main() {
     agave_logger::setup();
+    warn_if_installed_with_solana_cli();
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
@@ -416,4 +419,7 @@ fn main() {
 
     let manifest_path: Option<PathBuf> = matches.value_of_t("manifest_path").ok();
     test_solana(config, manifest_path);
+
+    // Repeat the warning so the test output doesn't bury it.
+    warn_if_installed_with_solana_cli();
 }
