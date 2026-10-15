@@ -41,7 +41,10 @@ fn main() {
     // crates.io), so write those to the terminal directly.
     let is_packaged = env::var_os("CARGO_MANIFEST_DIR")
         .is_some_and(|dir| Path::new(&dir).join("Cargo.toml.orig").exists());
-    if is_packaged && let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty") {
+    if !cfg!(windows)
+        && is_packaged
+        && let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty")
+    {
         // Clear any progress line cargo has drawn, then match cargo's warning
         // style.
         let _ = writeln!(
