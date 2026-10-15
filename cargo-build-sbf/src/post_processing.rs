@@ -3,7 +3,7 @@ use {
         config::Config,
         syscalls::SYSCALLS,
         toolchain::rust_target_triple,
-        utils::{copy_file, create_directory, generate_keypair, spawn},
+        utils::{copy_file, create_directory, spawn},
     },
     log::{debug, error, info, warn},
     regex::Regex,
@@ -110,14 +110,11 @@ fn strip_object(config: &Config, unstripped: &Path, stripped: &Path, llvm_bin: &
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn generate_debug_objects(
     config: &Config,
     sbf_debug_dir: &Path,
     finalized_program: &str,
     program_unstripped_so: &Path,
-    deploy_keypair: &Path,
-    debug_keypair: &PathBuf,
     program_name: &str,
     llvm_bin: &Path,
 ) -> PathBuf {
@@ -138,14 +135,6 @@ fn generate_debug_objects(
         copy_file(program_unstripped_so, &program_debug);
     }
 
-    if !debug_keypair.exists() {
-        if deploy_keypair.exists() {
-            copy_file(deploy_keypair, debug_keypair);
-        } else {
-            generate_keypair(debug_keypair);
-        }
-    }
-
     program_debug_stripped
 }
 
@@ -153,8 +142,6 @@ fn generate_release_objects(
     config: &Config,
     sbf_out_dir: &Path,
     program_unstripped_so: &Path,
-    deploy_keypair: &PathBuf,
-    debug_keypair: &Path,
     program_name: &str,
     llvm_bin: &Path,
 ) -> PathBuf {
@@ -162,14 +149,6 @@ fn generate_release_objects(
 
     if file_older_or_missing(program_unstripped_so, &program_so, config.arch) {
         strip_object(config, program_unstripped_so, &program_so, llvm_bin);
-    }
-
-    if !deploy_keypair.exists() {
-        if debug_keypair.exists() {
-            copy_file(debug_keypair, deploy_keypair);
-        } else {
-            generate_keypair(deploy_keypair);
-        }
     }
 
     program_so
@@ -198,10 +177,6 @@ pub fn post_process(
     };
 
     if let Some(program_name) = program_name {
-        let keypair_name = format!("{program_name}-keypair.json");
-        let deploy_keypair = sbf_out_dir.join(keypair_name.clone());
-        let debug_keypair = sbf_debug_dir.join(keypair_name);
-
         let finalized_program_file = format!("{program_name}.so");
 
         let program_unstripped_so = target_build_directory.join(finalized_program_file.clone());
@@ -219,8 +194,6 @@ pub fn post_process(
                 &sbf_debug_dir,
                 &finalized_program_file,
                 &program_unstripped_so,
-                &deploy_keypair,
-                &debug_keypair,
                 &program_name,
                 &llvm_bin,
             )
@@ -229,8 +202,6 @@ pub fn post_process(
                 config,
                 &sbf_out_dir,
                 &program_unstripped_so,
-                &deploy_keypair,
-                &debug_keypair,
                 &program_name,
                 &llvm_bin,
             )
@@ -294,8 +265,6 @@ pub fn post_process(
         if !config.debug {
             info!("To deploy this program:");
             info!("  $ solana program deploy {}", program_so.display());
-            info!("The program address will default to this keypair (override with --program-id):");
-            info!("  {}", deploy_keypair.display());
         }
     } else if config.dump {
         warn!("Note: --dump is only available for crates with a cdylib target");

@@ -110,6 +110,15 @@ fn clean_target(crate_name: &str) {
 #[serial]
 fn test_build() {
     run_cargo_build("noop", &[], false);
+    let keypair = env::current_dir()
+        .expect("Unable to get current working directory")
+        .join("tests")
+        .join("crates")
+        .join("noop")
+        .join("target")
+        .join("deploy")
+        .join("noop-keypair.json");
+    assert!(!keypair.exists());
     clean_target("noop");
 }
 

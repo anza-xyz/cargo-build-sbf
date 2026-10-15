@@ -2,7 +2,6 @@ use {
     itertools::Itertools,
     log::{error, info},
     regex::Regex,
-    solana_keypair::{Keypair, write_keypair_file},
     std::{
         env,
         ffi::{OsStr, OsString},
@@ -73,13 +72,6 @@ pub(crate) fn create_directory(path: &PathBuf) {
 pub(crate) fn copy_file(from: &Path, to: &Path) {
     std::fs::copy(from, to).unwrap_or_else(|err| {
         error!("Failed to copy file: {err}");
-        exit(1);
-    });
-}
-
-pub(crate) fn generate_keypair(path: &PathBuf) {
-    write_keypair_file(&Keypair::new(), path).unwrap_or_else(|err| {
-        error!("Unable to create {}: {err}", path.display());
         exit(1);
     });
 }
