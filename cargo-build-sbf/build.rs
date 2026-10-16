@@ -1,9 +1,4 @@
-use std::{
-    env,
-    fs::OpenOptions,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{env, path::PathBuf};
 
 fn main() {
     let Some(path_variable) = env::var_os("PATH") else {
@@ -27,33 +22,18 @@ fn main() {
         return;
     };
 
-    if solana_index > cargo_index {
-        return;
+    if solana_index < cargo_index {
+        let shadow = solana_bin.join("cargo-build-sbf");
+        if shadow.is_file() {
+            panic!(
+                "\nA version of `cargo-build-sbf` bundled with the Solana CLI at {shadow} will \
+                 shadow this installation.\n\nUpdate your PATH to place {cargo_bin} before \
+                 {solana_bin}.\n\nAlternatively, delete or rename {shadow}, though updating the \
+                 Solana CLI will restore it.\n",
+                shadow = shadow.display(),
+                cargo_bin = cargo_bin.display(),
+                solana_bin = solana_bin.display(),
+            );
+        }
     }
-
-    let warning = "Your cargo installation folder `~/.cargo/bin` appears to be after your Solana \
-                   installation folder `~/.local/share/solana/install/active_release/bin`. Update \
-                   your PATH to place `~/.cargo/bin` before \
-                   `~/.local/share/solana/install/active_release/bin`, or this installation won't \
-                   be used.";
-
-    // Cargo hides build script warnings for packaged builds (e.g. installs from
-    // crates.io), so write those to the terminal directly.
-    let is_packaged = env::var_os("CARGO_MANIFEST_DIR")
-        .is_some_and(|dir| Path::new(&dir).join("Cargo.toml.orig").exists());
-    if !cfg!(windows)
-        && is_packaged
-        && let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty")
-    {
-        // Clear any progress line cargo has drawn, then match cargo's warning
-        // style.
-        let _ = writeln!(
-            tty,
-            "\r\x1b[K\x1b[1;33mwarning\x1b[0m: cargo-build-sbf@{}: {warning}",
-            env!("CARGO_PKG_VERSION"),
-        );
-        return;
-    }
-
-    std::println!("cargo:warning={warning}");
 }
