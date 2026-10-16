@@ -8,7 +8,7 @@ use {
             make_platform_tools_path_for_version, rust_target_triple,
             validate_platform_tools_version,
         },
-        utils::{is_version_string, spawn},
+        utils::{is_version_string, solana_cli::warn_if_installed_with_solana_cli, spawn},
     },
     cargo_metadata::camino::Utf8PathBuf,
     clap::{Arg, crate_description, crate_name, crate_version},
@@ -278,6 +278,7 @@ fn build_solana(config: Config, manifest_path: Option<PathBuf>) {
 
 fn main() {
     agave_logger::setup_with_default("warn");
+    warn_if_installed_with_solana_cli();
     let mut args = env::args().collect::<Vec<_>>();
     // When run as a cargo subcommand, the first program argument is the subcommand name.
     // Remove it
@@ -595,8 +596,10 @@ fn main() {
                 make_platform_tools_path_for_version(&platform_tools_version).display()
             );
         }
-        return;
+    } else {
+        build_solana(config, manifest_path);
     }
 
-    build_solana(config, manifest_path);
+    // Repeat the warning so the build output doesn't bury it.
+    warn_if_installed_with_solana_cli();
 }
