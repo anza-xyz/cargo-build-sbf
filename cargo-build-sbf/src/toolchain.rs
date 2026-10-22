@@ -145,7 +145,11 @@ pub fn make_platform_tools_path_for_version(version: &str) -> PathBuf {
 
 pub fn get_base_rust_version(platform_tools_version: &str) -> String {
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
-    let rustc = target_path.join("rust").join("bin").join("rustc");
+    let rustc = target_path.join("rust").join("bin").join(if cfg!(windows) {
+        "rustc.exe"
+    } else {
+        "rustc"
+    });
     if !rustc.exists() {
         return String::from("");
     }
