@@ -21,7 +21,7 @@ use {
     tar::Archive,
 };
 
-pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.57";
+pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.58";
 pub const DEFAULT_RUST_VERSION: &str = "1.95.0";
 
 // Common headers used for Github API.
