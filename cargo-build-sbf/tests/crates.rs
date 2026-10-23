@@ -1,6 +1,8 @@
 use {
     assert_cmd::{assert::Assert, cargo::cargo_bin_cmd},
-    cargo_build_sbf::toolchain::{DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION},
+    cargo_build_sbf::toolchain::{
+        DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION, get_base_rust_version,
+    },
     predicates::prelude::*,
     std::{env, fs, path::PathBuf, str::FromStr},
 };
@@ -328,6 +330,17 @@ fn test_package_metadata_tools_version() {
 fn test_workspace_metadata_tools_version() {
     run_cargo_build("workspace-metadata", &[], false);
     clean_target("workspace-metadata");
+}
+
+#[test]
+#[serial]
+fn test_base_rust_version() {
+    // A non-default tools version names its toolchain from this. It used to
+    // look for `rustc` instead of `rustc.exe` on Windows and return "".
+    run_cargo_build("noop", &[], false);
+    clean_target("noop");
+    let version = get_base_rust_version(DEFAULT_PLATFORM_TOOLS_VERSION);
+    assert_eq!(version, format!("rustc {DEFAULT_RUST_VERSION}"));
 }
 
 #[test]
