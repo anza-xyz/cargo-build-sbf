@@ -568,6 +568,10 @@ fn check_solana_target_installed(target: &str) {
 }
 
 pub fn rust_target_triple(config: &Config) -> String {
+    if config.toolchain == crate::config::BuildToolchain::Upstream {
+        return "bpfel-unknown-none".to_string();
+    }
+
     let tools_version = semver::Version::parse(&semver_version(
         config
             .platform_tools_version

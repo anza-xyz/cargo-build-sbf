@@ -19,6 +19,17 @@ C program for Solana. Its releases are independently posted on the GitHub releas
 
 ## Platform Tools
 
+By default, builds use Anza's `platform-tools`. Select the upstream Rust/LLVM
+toolchain instead with:
+
+```
+cargo build-sbf --toolchain upstream
+```
+
+Upstream builds require the nightly Rust toolchain and `sbpf-linker` (install it
+with `cargo install sbpf-linker`). Use `--toolchain anza` to select the default
+explicitly.
+
 To see which version of platform-tools a given version of `cargo-build-sbf`
 uses by default, run `cargo build-sbf --version` or check out the release
 notes.
@@ -28,6 +39,9 @@ You can override the platform-tools version on the command-line:
 ```
 cargo build-sbf --tools-version v1.53
 ```
+
+`--toolchain upstream` overrides `--tools-version`. The `--tools-version` flag
+will soon be deprecated in favor of `--toolchain`.
 
 You can also pin it in the package manifest:
 
