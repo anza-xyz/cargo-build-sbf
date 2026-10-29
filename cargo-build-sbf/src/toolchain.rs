@@ -12,7 +12,7 @@ use {
     std::{
         env,
         ffi::OsString,
-        fs::{self, File},
+        fs::{self, File, TryLockError},
         io::{BufRead, BufReader, ErrorKind},
         path::{Path, PathBuf},
         process::{Command, exit},
@@ -181,7 +181,9 @@ fn retrieve_file_from_github_api(
     }
 
     let client = reqwest::blocking::Client::new();
-    let query_url = format!("https://api.github.com/repos/anza-xyz/platform-tools/releases/tags/{platform_tools_version}");
+    let query_url = format!(
+        "https://api.github.com/repos/anza-xyz/platform-tools/releases/tags/{platform_tools_version}"
+    );
 
     let mut query_headers = reqwest::header::HeaderMap::new();
     for item in GITHUB_API_JSON_RESPONSE_HEADERS {
@@ -218,7 +220,9 @@ fn retrieve_file_from_browser_url(
     platform_tools_version: &str,
     download_file_path: &Path,
 ) -> Result<(), String> {
-    let url = format!("https://github.com/anza-xyz/platform-tools/releases/download/{platform_tools_version}/{download_file_name}");
+    let url = format!(
+        "https://github.com/anza-xyz/platform-tools/releases/download/{platform_tools_version}/{download_file_name}"
+    );
     download_file(url.as_str(), download_file_path, true, &mut None)
 }
 
@@ -265,23 +269,72 @@ fn unpack_platform_tools(archive_path: &Path, target_path: &Path) -> Result<(), 
         .map_err(|err| format!("could not unpack downloaded archive: {err}"))
 }
 
+fn remove_if_exists(path: &Path) -> Result<(), String> {
+    let result = match path.symlink_metadata() {
+        Ok(metadata) if metadata.is_dir() => fs::remove_dir_all(path),
+        Ok(_) => fs::remove_file(path),
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(err) => Err(err),
+    };
+    result.map_err(|err| format!("could not remove {path:?}: {err}"))
+}
+
 // Check whether a package is installed and install it if missing. Returns
 // whether a fresh installation was performed.
+//
+// The package is downloaded and unpacked into a staging directory next to
+// `target_path` and only renamed into place once complete, so an interrupted
+// installation never leaves a partially populated `target_path` behind.
 pub(crate) fn install_if_missing(
     config: &Config,
     platform_tools_version: &str,
     target_path: &Path,
     use_rest_api: bool,
 ) -> Result<bool, String> {
-    if config.force_tools_install && target_path.is_dir() {
-        debug!("Remove directory {target_path:?}");
-        fs::remove_dir_all(target_path)
-            .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
+    let parent_path = target_path
+        .parent()
+        .ok_or(format!("invalid package path {target_path:?}"))?;
+    fs::create_dir_all(parent_path)
+        .map_err(|err| format!("could not create {parent_path:?}: {err}"))?;
+
+    // Serialize installations of the same version across processes. The OS
+    // releases the lock when the file is closed, even if the process is killed.
+    let lock_path = parent_path.join(".install.lock");
+    let lock_file =
+        File::create(&lock_path).map_err(|err| format!("could not create {lock_path:?}: {err}"))?;
+    match lock_file.try_lock() {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => {
+            eprintln!("Waiting for another process to finish installing platform-tools...");
+            lock_file
+                .lock()
+                .map_err(|err| format!("could not lock {lock_path:?}: {err}"))?;
+        }
+        Err(TryLockError::Error(err)) => {
+            return Err(format!("could not lock {lock_path:?}: {err}"));
+        }
     }
+
+    // Only delete if able to grab file lock. Otherwise this creates a race condition for 2
+    // competing tool installs.
+    // 1. This will always have a valid tool installation
+    // 2. But, It can still pull the toolchain under another process that's building.
+    if config.force_tools_install {
+        debug!("Remove {target_path:?}");
+        remove_if_exists(target_path)?;
+    }
+
+    let file_name = target_path
+        .file_name()
+        .ok_or(format!("invalid package path {target_path:?}"))?
+        .to_string_lossy();
+    let staging_path = parent_path.join(format!("{file_name}.partial"));
+    // Leftovers of an interrupted installation.
+    remove_if_exists(&staging_path)?;
+
     // Check whether the target path is an empty directory. This can
-    // happen if package download failed on previous run of
-    // cargo-build-sbf.  Remove the target_path directory in this
-    // case.
+    // happen if package download failed on a run of an older
+    // cargo-build-sbf. Remove the target_path directory in this case.
     if target_path.is_dir()
         && target_path
             .read_dir()
@@ -304,15 +357,9 @@ pub(crate) fn install_if_missing(
     {
         return Ok(false);
     }
+    // A stray file would make the final rename fail.
+    remove_if_exists(target_path)?;
 
-    if target_path.exists() {
-        debug!("Remove file {target_path:?}");
-        fs::remove_file(target_path)
-            .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
-    }
-
-    fs::create_dir_all(target_path)
-        .map_err(|err| format!("could not create {target_path:?}: {err}"))?;
     let arch = if cfg!(target_arch = "aarch64") {
         "aarch64"
     } else {
@@ -326,11 +373,9 @@ pub(crate) fn install_if_missing(
         format!("platform-tools-linux-{arch}.tar.bz2")
     };
 
-    let download_file_path = target_path.join(&platform_tools_download_file_name);
-    if download_file_path.exists() {
-        fs::remove_file(&download_file_path)
-            .map_err(|err| format!("could not remove {download_file_path:?}: {err}"))?;
-    }
+    fs::create_dir_all(&staging_path)
+        .map_err(|err| format!("could not create {staging_path:?}: {err}"))?;
+    let download_file_path = staging_path.join(&platform_tools_download_file_name);
 
     eprintln!("Downloading platform-tools {platform_tools_version}");
     download_platform_tools(
@@ -338,10 +383,22 @@ pub(crate) fn install_if_missing(
         platform_tools_version,
         &download_file_path,
         use_rest_api,
-    )?;
-    unpack_platform_tools(&download_file_path, target_path)?;
-    fs::remove_file(download_file_path)
-        .map_err(|err| format!("could not remove downloaded archive: {err}"))?;
+    )
+    .and_then(|()| unpack_platform_tools(&download_file_path, &staging_path))
+    .and_then(|()| {
+        fs::remove_file(&download_file_path)
+            .map_err(|err| format!("could not remove downloaded archive: {err}"))
+    })
+    .inspect_err(|_| {
+        let _ = fs::remove_dir_all(&staging_path);
+    })?;
+
+    // LINUXS and MACOS: Since target_path may not exist during rename(2) there is a chance of old_path and new_path
+    // existing at the same time. It shouldn't cause any broken toolchains though, since target_path
+    // will always be a valid toolchain.
+    fs::rename(&staging_path, target_path)
+        .map_err(|err| format!("could not move {staging_path:?} to {target_path:?}: {err}"))?;
+
     if should_nix_patch_bins_and_dylibs(config)
         && let Err(e) = nix_patch_all_bins_and_dylibs(target_path)
     {
@@ -455,19 +512,6 @@ pub fn install_tools(config: &Config, platform_tools_version: &str, use_rest_api
     let target_path = make_platform_tools_path_for_version(platform_tools_version);
     install_if_missing(config, platform_tools_version, &target_path, use_rest_api).unwrap_or_else(
         |err| {
-            // The package version directory doesn't contain a valid
-            // installation, and it should be removed.
-            let target_path_parent = target_path.parent().expect("Invalid package path");
-            if target_path_parent.exists() {
-                fs::remove_dir_all(target_path_parent).unwrap_or_else(|err| {
-                    error!(
-                        "Failed to remove {} while recovering from installation failure: {}",
-                        target_path_parent.to_string_lossy(),
-                        err,
-                    );
-                    exit(1);
-                });
-            }
             error!("Failed to install platform-tools: {err}");
             exit(1);
         },
@@ -519,10 +563,13 @@ pub fn install_and_link_tools(
         .map(|version| version >= minimum_version || version.patch > 0);
 
     if (config.arch == "v3" || config.arch == "v4") && is_valid_version == Some(false) {
-        error!("Platform tools {platform_tools_version} is incompatible with SBPF{}. \
+        error!(
+            "Platform tools {platform_tools_version} is incompatible with SBPF{}. \
         Refer to https://github.com/anza-xyz/cargo-build-sbf#sbfpv3-migration for more \
         information. Run `cargo-build-sbf --arch v0` if you wish to use this platform tools \
-        version.", config.arch);
+        version.",
+            config.arch
+        );
         exit(1);
     }
 
