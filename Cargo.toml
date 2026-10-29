@@ -1,6 +1,6 @@
 [workspace]
 members = ["cargo-build-sbf", "gen-headers"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = "4.5.0"
@@ -10,6 +10,7 @@ repository = "https://github.com/anza-xyz/cargo-build-sbf"
 homepage = "https://anza.xyz/"
 license = "Apache-2.0"
 edition = "2024"
+rust-version = "1.98"
 
 [workspace.lints.rust]
 # List of rust-2024-compatibility lints that are already satisfied

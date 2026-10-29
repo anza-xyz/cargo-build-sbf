@@ -1,2 +1,3 @@
 [toolchain]
+# Should be kept in sync with workspace `rust-version`
 channel = "1.98.0"
