@@ -1,12 +1,18 @@
 use {
     crate::{
         config::Config,
-        syscalls::SYSCALLS,
+        syscalls::{DENY_SYSCALLS, SYSCALLS},
         toolchain::rust_target_triple,
         utils::{copy_file, create_directory, generate_keypair, spawn},
     },
     log::{debug, error, info, warn},
     regex::Regex,
+    solana_sbpf::{
+        declare_builtin_function, ebpf,
+        program::{BuiltinProgram, SBPFVersion},
+        verifier::{LocalVerifier, Verifier, VerifierError::InvalidSyscall},
+        vm::ContextObject,
+    },
     std::{
         collections::HashMap,
         fs::{self, File, OpenOptions},
@@ -291,6 +297,9 @@ pub fn post_process(
             check_undefined_symbols(config, platform_tools_dir, &program_so);
         }
 
+        if config.arch == "v3" {
+            verify_program(&program_unstripped_so, config);
+        }
         if !config.debug {
             info!("To deploy this program:");
             info!("  $ solana program deploy {}", program_so.display());
@@ -299,6 +308,66 @@ pub fn post_process(
         }
     } else if config.dump {
         warn!("Note: --dump is only available for crates with a cdylib target");
+    }
+}
+
+/// Only supported for v3 for now
+fn verify_program(program_path: &PathBuf, config: &Config) {
+    let sbpf_version = match config.arch {
+        "v3" => SBPFVersion::V3,
+        _ => unreachable!("Impossible based on clap argument validation and conditional"),
+    };
+    struct DummyContextObject {}
+    impl ContextObject for DummyContextObject {
+        fn consume(&mut self, _amount: u64) {}
+
+        fn get_remaining(&self) -> u64 {
+            0
+        }
+
+        fn active_mapping_ptr(
+            &mut self,
+        ) -> std::ptr::NonNull<solana_sbpf::memory_region::MemoryMapping> {
+            unreachable!("only used for verification of program, not execution")
+        }
+    }
+    declare_builtin_function!(
+        SyscallStub,
+        fn rust(
+            invoke_context: &mut DummyContextObject,
+            _arg0: u64,
+            _arg1: u64,
+            _arg2: u64,
+            _arg3: u64,
+            _arg4: u64,
+        ) -> Result<u64, Box<dyn std::error::Error>> {
+            unreachable!("Only used for verification")
+        }
+    );
+    let mut file = File::open(program_path).expect("failed to open program file");
+    let mut program_data = Vec::new();
+    file.read_to_end(&mut program_data)
+        .expect("failed to read program file");
+    let mut loader = BuiltinProgram::<DummyContextObject>::new_mock();
+    for &call in SYSCALLS.iter() {
+        if !DENY_SYSCALLS.contains(&call) {
+            loader
+                .register_definition::<SyscallStub>(call)
+                .expect("Failed to register syscall");
+        }
+    }
+
+    if let Err(verifier_error) =
+        LocalVerifier::verify(&program_data, sbpf_version, loader.get_function_registry())
+    {
+        match verifier_error {
+            InvalidSyscall(imm) if imm == ebpf::hash_symbol_name(b"sol_alloc_free_") => {
+                warn!(
+                    "{verifier_error}, Attempted to allocate to heap, but no allocator found. Define your own with: https://doc.rust-lang.org/beta/std/alloc/trait.GlobalAlloc.html"
+                )
+            }
+            _ => warn!("{verifier_error}"),
+        }
     }
 }
 

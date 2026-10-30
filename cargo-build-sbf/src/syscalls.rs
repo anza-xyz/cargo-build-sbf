@@ -42,3 +42,6 @@ pub(crate) const SYSCALLS: &[&str] = &[
     "sol_get_sysvar",
     "sol_get_epoch_stake",
 ];
+
+// List of syscalls not supported anymore
+pub(crate) const DENY_SYSCALLS: &[&str] = &["sol_alloc_free_"];

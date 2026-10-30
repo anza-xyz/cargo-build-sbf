@@ -1,0 +1,15 @@
+[package]
+name = "alloc-free"
+version = "4.1.0-alpha.0"
+description = "Solana SBF test program written in Rust"
+authors = ["Anza Maintainers <maintainers@anza.xyz>"]
+repository = "https://github.com/anza-xyz/agave"
+license = "Apache-2.0"
+homepage = "https://anza.xyz"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]
