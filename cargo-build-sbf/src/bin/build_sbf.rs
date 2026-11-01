@@ -155,14 +155,23 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         cargo_build_args.push("--workspace");
     }
     cargo_build_args.append(&mut config.cargo_args.clone());
-    let output = spawn(
-        &cargo_build,
-        &cargo_build_args,
-        config.generate_child_script_on_failure,
-    );
 
-    if config.verbose {
-        debug!("{output}");
+    if config.dry_run {
+        println!(
+            "{} {}",
+            cargo_build.display(),
+            cargo_build_args.join(" ")
+        );
+    } else {
+        let output = spawn(
+            &cargo_build,
+            &cargo_build_args,
+            config.generate_child_script_on_failure,
+        );
+
+        if config.verbose {
+            debug!("{output}");
+        }
     }
 }
 
@@ -237,18 +246,24 @@ fn build_solana(config: Config, manifest_path: Option<PathBuf>) {
             prepare_environment(&config, Some(root_package), &metadata);
         let platform_tools_dir = make_platform_tools_path_for_version(&validated_toolchain_version);
         invoke_cargo(&config, &platform_tools_dir, validated_toolchain_version);
-        post_process(
-            &config,
-            &platform_tools_dir,
-            target_dir.as_ref(),
-            program_name,
-        );
+        if !config.dry_run {
+            post_process(
+                &config,
+                &platform_tools_dir,
+                target_dir.as_ref(),
+                program_name,
+            );
+        }
         return;
     }
 
     let validated_toolchain_version = prepare_environment(&config, None, &metadata);
     let platform_tools_dir = make_platform_tools_path_for_version(&validated_toolchain_version);
     invoke_cargo(&config, &platform_tools_dir, validated_toolchain_version);
+
+    if config.dry_run {
+        return;
+    }
 
     let all_sbf_packages = metadata
         .packages
@@ -345,6 +360,12 @@ fn main() {
                 .multiple_occurrences(true)
                 .multiple_values(true)
                 .help("Space-separated list of features to activate"),
+        )
+        .arg(
+            Arg::new("dry_run")
+                .long("dry-run")
+                .takes_value(false)
+                .help("Does not run the build. Outputs the command to be executed"),
         )
         .arg(
             Arg::new("force_tools_install")
@@ -547,6 +568,7 @@ fn main() {
         }),
         platform_tools_version: matches.value_of("tools_version"),
         dump: matches.is_present("dump"),
+        dry_run: matches.is_present("dry_run"),
         features: matches.values_of_t("features").ok().unwrap_or_default(),
         force_tools_install: matches.is_present("force_tools_install"),
         skip_tools_install: matches.is_present("skip_tools_install"),
