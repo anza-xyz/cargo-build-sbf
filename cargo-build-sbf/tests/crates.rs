@@ -481,7 +481,7 @@ fn test_toolchain_argument() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "--lto is ignored when --toolchain upstream is used",
+            "LTO must be disabled when using --toolchain upstream",
         ))
         .stderr(predicate::str::contains(
             "--toolchain upstream only supports --arch v0 and --arch v3",

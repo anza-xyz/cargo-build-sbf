@@ -56,6 +56,28 @@ fn lto_rustflags(toolchain: BuildToolchain, lto_requested: bool) -> Option<&'sta
     }
 }
 
+fn cargo_profile_lto_env(debug: bool, cargo_args: &[&str]) -> String {
+    let profile = cargo_args
+        .windows(2)
+        .find_map(|args| (args[0] == "--profile").then_some(args[1]))
+        .or_else(|| {
+            cargo_args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--profile="))
+        })
+        .unwrap_or_else(|| {
+            if !debug || cargo_args.contains(&"--release") {
+                "release"
+            } else {
+                "dev"
+            }
+        });
+    format!(
+        "CARGO_PROFILE_{}_LTO",
+        profile.to_uppercase().replace('-', "_")
+    )
+}
+
 fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_version: String) {
     let target_triple = rust_target_triple(config);
 
@@ -84,6 +106,12 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
             env::set_var("OBJDUMP", llvm_bin.join("llvm-objdump"));
             env::set_var("OBJCOPY", llvm_bin.join("llvm-objcopy"));
         }
+    } else {
+        // Override profile settings such as `lto = "fat"` in Cargo.toml. The explicit
+        // `-C lto=false` added below also takes precedence over LTO in user rustflags.
+        let profile_lto_env = cargo_profile_lto_env(config.debug, &config.cargo_args);
+        // Safety: cargo-build-sbf doesn't spawn any threads until final child process is spawned
+        unsafe { env::set_var(profile_lto_env, "false") }
     }
     let cargo_target = format!(
         "CARGO_TARGET_{}_RUSTFLAGS",
@@ -632,8 +660,11 @@ fn main() {
         use_abi_v2: matches.is_present("abi_v2"),
     };
 
-    if config.lto && config.toolchain == BuildToolchain::Upstream {
-        warn!("--lto is ignored when --toolchain upstream is used");
+    if config.toolchain == BuildToolchain::Upstream {
+        warn!(
+            "LTO must be disabled when using --toolchain upstream; --lto, `-C lto=fat`, and \
+             `lto = \"fat\"` profile settings are ignored"
+        );
     }
 
     if config.use_abi_v2 && config.arch != "v3" {
@@ -699,6 +730,23 @@ mod tests {
         assert_eq!(
             lto_rustflags(BuildToolchain::Upstream, true),
             Some("-C lto=false")
+        );
+    }
+
+    #[test]
+    fn test_cargo_profile_lto_env() {
+        assert_eq!(
+            cargo_profile_lto_env(false, &[]),
+            "CARGO_PROFILE_RELEASE_LTO"
+        );
+        assert_eq!(cargo_profile_lto_env(true, &[]), "CARGO_PROFILE_DEV_LTO");
+        assert_eq!(
+            cargo_profile_lto_env(true, &["--profile", "sbf-release"]),
+            "CARGO_PROFILE_SBF_RELEASE_LTO"
+        );
+        assert_eq!(
+            cargo_profile_lto_env(true, &["--profile=bench"]),
+            "CARGO_PROFILE_BENCH_LTO"
         );
     }
 }
