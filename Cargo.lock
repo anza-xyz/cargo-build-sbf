@@ -10,9 +10,9 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agave-logger"
-version = "4.3.0"
+version = "4.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64074095123aa701172f8fd44b822d2d6216fe83d263e9d294efa74b919353b0"
+checksum = "b4607244fabd7a19aa01ec88908b743c49b3707649e37f3dc7e3d5684e17183b"
 dependencies = [
  "env_logger",
  "libc",
