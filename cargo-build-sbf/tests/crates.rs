@@ -466,3 +466,42 @@ fn test_version() {
              {DEFAULT_RUST_VERSION}\n"
         )));
 }
+
+#[test]
+fn test_toolchain_argument() {
+    cargo_bin_cmd!("cargo-build-sbf")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--toolchain <toolchain>"))
+        .stdout(predicate::str::contains("[default: anza]"));
+
+    cargo_bin_cmd!("cargo-build-sbf")
+        .args(["--toolchain", "upstream", "--lto", "--arch", "v2"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "LTO must be disabled when using --toolchain upstream",
+        ))
+        .stderr(predicate::str::contains(
+            "--toolchain upstream only supports --arch v0 and --arch v3",
+        ));
+}
+
+#[test]
+fn test_tools_version_deprecation_warning() {
+    cargo_bin_cmd!("cargo-build-sbf")
+        .args([
+            "--toolchain",
+            "upstream",
+            "--tools-version",
+            "v1.53",
+            "--install-only",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--tools-version will soon be deprecated in favor of --toolchain; --toolchain \
+             upstream overrides the value set here",
+        ));
+}

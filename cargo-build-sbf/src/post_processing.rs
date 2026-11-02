@@ -175,6 +175,49 @@ fn generate_release_objects(
     program_so
 }
 
+fn generate_upstream_objects(
+    config: &Config,
+    sbf_out_dir: &Path,
+    sbf_debug_dir: &Path,
+    finalized_program: &str,
+    program_unstripped_so: &Path,
+    deploy_keypair: &PathBuf,
+    debug_keypair: &PathBuf,
+) -> PathBuf {
+    let program_so = if config.debug {
+        let program_debug = sbf_debug_dir.join(format!("{finalized_program}.debug"));
+        let program_debug_stripped = sbf_debug_dir.join(finalized_program);
+        if file_older_or_missing(program_unstripped_so, &program_debug, config.arch) {
+            copy_file(program_unstripped_so, &program_debug);
+        }
+        if file_older_or_missing(program_unstripped_so, &program_debug_stripped, config.arch) {
+            copy_file(program_unstripped_so, &program_debug_stripped);
+        }
+        program_debug_stripped
+    } else {
+        let program_so = sbf_out_dir.join(finalized_program);
+        if file_older_or_missing(program_unstripped_so, &program_so, config.arch) {
+            copy_file(program_unstripped_so, &program_so);
+        }
+        program_so
+    };
+
+    let (keypair, fallback_keypair) = if config.debug {
+        (debug_keypair, deploy_keypair)
+    } else {
+        (deploy_keypair, debug_keypair)
+    };
+    if !keypair.exists() {
+        if fallback_keypair.exists() {
+            copy_file(fallback_keypair, keypair);
+        } else {
+            generate_keypair(keypair);
+        }
+    }
+
+    program_so
+}
+
 pub fn post_process(
     config: &Config,
     platform_tools_dir: &Path,
@@ -204,7 +247,12 @@ pub fn post_process(
 
         let finalized_program_file = format!("{program_name}.so");
 
-        let program_unstripped_so = target_build_directory.join(finalized_program_file.clone());
+        let built_program_file = if config.toolchain == crate::config::BuildToolchain::Upstream {
+            format!("lib{finalized_program_file}")
+        } else {
+            finalized_program_file.clone()
+        };
+        let program_unstripped_so = target_build_directory.join(built_program_file);
         let program_dump = sbf_out_dir.join(format!("{program_name}-dump.txt"));
 
         let llvm_bin = platform_tools_dir.join("llvm").join("bin");
@@ -213,7 +261,17 @@ pub fn post_process(
             patch_abi_v2_header(&program_unstripped_so);
         }
 
-        let program_so = if config.debug {
+        let program_so = if config.toolchain == crate::config::BuildToolchain::Upstream {
+            generate_upstream_objects(
+                config,
+                &sbf_out_dir,
+                &sbf_debug_dir,
+                &finalized_program_file,
+                &program_unstripped_so,
+                &deploy_keypair,
+                &debug_keypair,
+            )
+        } else if config.debug {
             generate_debug_objects(
                 config,
                 &sbf_debug_dir,
@@ -236,7 +294,9 @@ pub fn post_process(
             )
         };
 
-        if config.dump {
+        if config.dump && config.toolchain == crate::config::BuildToolchain::Upstream {
+            warn!("--dump is not supported with --toolchain upstream");
+        } else if config.dump {
             let mangled_name = format!("{}.mangled", program_dump.display());
             {
                 let mangled =
@@ -286,7 +346,10 @@ pub fn post_process(
             postprocess_dump(&program_dump);
         }
 
-        if config.arch != "v3" && config.arch != "v4" {
+        if config.toolchain == crate::config::BuildToolchain::Anza
+            && config.arch != "v3"
+            && config.arch != "v4"
+        {
             // SBPFv3 shall not have any undefined syscall.
             check_undefined_symbols(config, platform_tools_dir, &program_so);
         }
