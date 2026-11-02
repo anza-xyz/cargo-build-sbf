@@ -123,7 +123,8 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
              link-arg=--llvm-args=--bpf-stack-size={stack_size} -C \
              link-arg=--llvm-args=--bpf-max-stores-per-memfunc=5 -C \
              link-arg=--llvm-args=--disable-gotox -C link-arg=--llvm-args=--disable-ldsx -C \
-             link-arg=--llvm-args=--disable-movsx --cfg=target_os=\"solana\" \
+             link-arg=--llvm-args=--disable-movsx -C link-arg=--llvm-args=--disable-bswap \
+             --cfg=target_os=\"solana\" \
              --cfg=target_feature=\"static-syscalls\" -A \
              explicit_builtin_cfgs_in_flags{linker_arch}",
             target_cpu,
