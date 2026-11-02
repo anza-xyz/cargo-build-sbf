@@ -477,9 +477,12 @@ fn test_toolchain_argument() {
         .stdout(predicate::str::contains("[default: anza]"));
 
     cargo_bin_cmd!("cargo-build-sbf")
-        .args(["--toolchain", "upstream", "--arch", "v2"])
+        .args(["--toolchain", "upstream", "--lto", "--arch", "v2"])
         .assert()
         .failure()
+        .stderr(predicate::str::contains(
+            "--lto is ignored when --toolchain upstream is used",
+        ))
         .stderr(predicate::str::contains(
             "--toolchain upstream only supports --arch v0 and --arch v3",
         ));

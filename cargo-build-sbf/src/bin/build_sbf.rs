@@ -48,11 +48,11 @@ fn prepare_environment(
     }
 }
 
-fn lto_rustflags(toolchain: BuildToolchain, lto_requested: bool) -> &'static str {
-    if toolchain == BuildToolchain::Anza || lto_requested {
-        "-C embed-bitcode=yes -C lto=fat"
-    } else {
-        "-C lto=false"
+fn lto_rustflags(toolchain: BuildToolchain, lto_requested: bool) -> Option<&'static str> {
+    match (toolchain, lto_requested) {
+        (BuildToolchain::Anza, true) => Some("-C embed-bitcode=yes -C lto=fat"),
+        (BuildToolchain::Upstream, _) => Some("-C lto=false"),
+        (BuildToolchain::Anza, false) => None,
     }
 }
 
@@ -105,10 +105,9 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
     if config.optimize_size {
         target_rustflags = Cow::Owned(format!("{target_rustflags} -C opt-level=s"));
     }
-    target_rustflags = Cow::Owned(format!(
-        "{target_rustflags} {}",
-        lto_rustflags(config.toolchain, config.lto),
-    ));
+    if let Some(lto_rustflags) = lto_rustflags(config.toolchain, config.lto) {
+        target_rustflags = Cow::Owned(format!("{target_rustflags} {lto_rustflags}"));
+    }
     if let Some(stack_size) = config.sbf_stack_size
         && config.toolchain == BuildToolchain::Anza
     {
@@ -530,8 +529,8 @@ fn main() {
         )
         .arg(Arg::new("lto").long("lto").takes_value(false).help(
             "Enable Link-Time Optimization (LTO) for all crates being built. This option may \
-             decrease program size and CU consumption. LTO defaults to `fat` with the Anza \
-             toolchain and `false` with the upstream toolchain.",
+             decrease program size and CU consumption. The option is ignored when using the \
+             upstream toolchain.",
         ))
         .arg(
             Arg::new("patch_binaries_for_nix")
@@ -633,6 +632,10 @@ fn main() {
         use_abi_v2: matches.is_present("abi_v2"),
     };
 
+    if config.lto && config.toolchain == BuildToolchain::Upstream {
+        warn!("--lto is ignored when --toolchain upstream is used");
+    }
+
     if config.use_abi_v2 && config.arch != "v3" {
         error!("--abi-v2 requires --arch v3");
         exit(1);
@@ -680,21 +683,22 @@ mod tests {
 
     #[test]
     fn test_default_lto_rustflags() {
-        assert_eq!(
-            lto_rustflags(BuildToolchain::Anza, false),
-            "-C embed-bitcode=yes -C lto=fat"
-        );
+        assert_eq!(lto_rustflags(BuildToolchain::Anza, false), None);
         assert_eq!(
             lto_rustflags(BuildToolchain::Upstream, false),
-            "-C lto=false"
+            Some("-C lto=false")
         );
     }
 
     #[test]
-    fn test_lto_flag_enables_fat_lto() {
+    fn test_lto_flag_only_enables_fat_lto_for_anza() {
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Anza, true),
+            Some("-C embed-bitcode=yes -C lto=fat")
+        );
         assert_eq!(
             lto_rustflags(BuildToolchain::Upstream, true),
-            "-C embed-bitcode=yes -C lto=fat"
+            Some("-C lto=false")
         );
     }
 }
