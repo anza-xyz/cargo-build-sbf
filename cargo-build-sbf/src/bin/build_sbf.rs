@@ -48,6 +48,14 @@ fn prepare_environment(
     }
 }
 
+fn lto_rustflags(toolchain: BuildToolchain, lto_requested: bool) -> &'static str {
+    if toolchain == BuildToolchain::Anza || lto_requested {
+        "-C embed-bitcode=yes -C lto=fat"
+    } else {
+        "-C lto=false"
+    }
+}
+
 fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_version: String) {
     let target_triple = rust_target_triple(config);
 
@@ -97,11 +105,10 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
     if config.optimize_size {
         target_rustflags = Cow::Owned(format!("{target_rustflags} -C opt-level=s"));
     }
-    if config.lto {
-        target_rustflags = Cow::Owned(format!(
-            "{target_rustflags} -C embed-bitcode=yes -C lto=fat",
-        ));
-    }
+    target_rustflags = Cow::Owned(format!(
+        "{target_rustflags} {}",
+        lto_rustflags(config.toolchain, config.lto),
+    ));
     if let Some(stack_size) = config.sbf_stack_size
         && config.toolchain == BuildToolchain::Anza
     {
@@ -523,8 +530,8 @@ fn main() {
         )
         .arg(Arg::new("lto").long("lto").takes_value(false).help(
             "Enable Link-Time Optimization (LTO) for all crates being built. This option may \
-             decrease program size and CU consumption. The default option is LTO disabled, as one \
-             may get mixed results with it.",
+             decrease program size and CU consumption. LTO defaults to `fat` with the Anza \
+             toolchain and `false` with the upstream toolchain.",
         ))
         .arg(
             Arg::new("patch_binaries_for_nix")
@@ -665,4 +672,29 @@ fn main() {
 
     // Repeat the warning so the build output doesn't bury it.
     warn_if_installed_with_solana_cli();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_lto_rustflags() {
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Anza, false),
+            "-C embed-bitcode=yes -C lto=fat"
+        );
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Upstream, false),
+            "-C lto=false"
+        );
+    }
+
+    #[test]
+    fn test_lto_flag_enables_fat_lto() {
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Upstream, true),
+            "-C embed-bitcode=yes -C lto=fat"
+        );
+    }
 }
