@@ -1,12 +1,12 @@
 use {
     crate::{
         config::Config,
-        syscalls::{DENY_SYSCALLS, SYSCALLS},
         toolchain::rust_target_triple,
         utils::{copy_file, create_directory, generate_keypair, spawn},
     },
     log::{debug, error, info, warn},
     regex::Regex,
+    solana_define_syscall::definitions::SYSCALLS,
     solana_sbpf::{
         declare_builtin_function, ebpf,
         program::{BuiltinProgram, SBPFVersion},
@@ -310,6 +310,9 @@ pub fn post_process(
         warn!("Note: --dump is only available for crates with a cdylib target");
     }
 }
+
+// List of syscalls not supported anymore
+const DENY_SYSCALLS: &[&str] = &["sol_alloc_free_"];
 
 /// Only supported for v3 for now
 fn verify_program(program_path: &PathBuf, config: &Config) {

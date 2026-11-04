@@ -267,6 +267,7 @@ dependencies = [
  "semver",
  "serde",
  "serial_test",
+ "solana-define-syscall",
  "solana-file-download",
  "solana-keypair",
  "solana-sbpf",
@@ -2104,9 +2105,9 @@ dependencies = [
 
 [[package]]
 name = "solana-define-syscall"
-version = "5.2.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf8209ece2bd9f1450e672858ffc0e5c8c786ff6916d2a862b126dd0128f380f"
+checksum = "8506988b0997022c4f2801985d9c4dccfb18c16e6a38f30390a47d54efeca805"
 
 [[package]]
 name = "solana-ed25519"
