@@ -275,6 +275,23 @@ fn remove_if_exists(path: &Path) -> Result<(), String> {
     result.map_err(|err| format!("could not remove {path:?}: {err}"))
 }
 
+// A package counts as installed if `target_path` is a symlink or a non-empty
+// directory.
+// NOTE:
+// 1. An empty directory is the leftover of a failed download by an
+// older cargo-build-sbf and does not count.
+// 2. An empty directory is not possible, since we move from staging to final in an atomic step
+fn is_installed(target_path: &Path) -> bool {
+    match target_path.symlink_metadata() {
+        Ok(metadata) if metadata.file_type().is_symlink() => true,
+        Ok(metadata) if metadata.is_dir() => target_path
+            .read_dir()
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false),
+        _ => false,
+    }
+}
+
 // Check whether a package is installed and install it if missing. Returns
 // whether a fresh installation was performed.
 //
@@ -287,14 +304,17 @@ pub(crate) fn install_if_missing(
     target_path: &Path,
     use_rest_api: bool,
 ) -> Result<bool, String> {
+    if !config.force_tools_install && is_installed(target_path) {
+        return Ok(false);
+    }
+
     let parent_path = target_path
         .parent()
         .ok_or(format!("invalid package path {target_path:?}"))?;
     fs::create_dir_all(parent_path)
         .map_err(|err| format!("could not create {parent_path:?}: {err}"))?;
 
-    // Serialize installations of the same version across processes. The OS
-    // releases the lock when the file is closed, even if the process is killed.
+    // Serialize installations of the same version across processes.
     let lock_path = parent_path.join(".install.lock");
     let lock_file =
         File::create(&lock_path).map_err(|err| format!("could not create {lock_path:?}: {err}"))?;
@@ -328,32 +348,14 @@ pub(crate) fn install_if_missing(
     // Leftovers of an interrupted installation.
     remove_if_exists(&staging_path)?;
 
-    // Check whether the target path is an empty directory. This can
-    // happen if package download failed on a run of an older
-    // cargo-build-sbf. Remove the target_path directory in this case.
-    if target_path.is_dir()
-        && target_path
-            .read_dir()
-            .map_err(|err| err.to_string())?
-            .next()
-            .is_none()
-    {
-        debug!("Remove directory {target_path:?}");
-        fs::remove_dir(target_path)
-            .map_err(|err| format!("could not remove {target_path:?}: {err}"))?;
-    }
-
-    // Check whether the package is already in ~/.cache/solana.
-    // Download it and place in the proper location if not found.
-    if target_path.is_dir()
-        || target_path
-            .symlink_metadata()
-            .map(|metadata| metadata.file_type().is_symlink())
-            .unwrap_or(false)
-    {
+    // Re-check : another process may have finished installing
+    // while this one was waiting.
+    if is_installed(target_path) {
         return Ok(false);
     }
-    // A stray file would make the final rename fail.
+
+    // Clear an empty directory left by an older cargo-build-sbf, or a stray
+    // file, either of which would make the final rename fail.
     remove_if_exists(target_path)?;
 
     let arch = if cfg!(target_arch = "aarch64") {
