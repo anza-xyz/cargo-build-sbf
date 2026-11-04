@@ -561,13 +561,10 @@ pub fn install_and_link_tools(
         .map(|version| version >= minimum_version || version.patch > 0);
 
     if (config.arch == "v3" || config.arch == "v4") && is_valid_version == Some(false) {
-        error!(
-            "Platform tools {platform_tools_version} is incompatible with SBPF{}. \
+        error!("Platform tools {platform_tools_version} is incompatible with SBPF{}. \
         Refer to https://github.com/anza-xyz/cargo-build-sbf#sbfpv3-migration for more \
         information. Run `cargo-build-sbf --arch v0` if you wish to use this platform tools \
-        version.",
-            config.arch
-        );
+        version.", config.arch);
         exit(1);
     }
 
