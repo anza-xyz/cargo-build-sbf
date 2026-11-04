@@ -14,6 +14,7 @@ use {
 struct Config<'a> {
     sbf_out_dir: Option<String>,
     platform_tools_version: Option<String>,
+    toolchain: &'a str,
     cargo: PathBuf,
     cargo_build_sbf: PathBuf,
     extra_cargo_test_args: Vec<String>,
@@ -37,6 +38,7 @@ impl Default for Config<'_> {
         Self {
             sbf_out_dir: None,
             platform_tools_version: None,
+            toolchain: "anza",
             cargo: PathBuf::from("cargo"),
             cargo_build_sbf: PathBuf::from("cargo-build-sbf"),
             extra_cargo_test_args: vec![],
@@ -91,6 +93,9 @@ fn test_solana_package(
 
     build_sbf_args.push("--arch");
     build_sbf_args.push(config.arch);
+
+    build_sbf_args.push("--toolchain");
+    build_sbf_args.push(config.toolchain);
 
     if let Some(tools_version) = config.platform_tools_version.as_ref() {
         build_sbf_args.push("--tools-version");
@@ -358,13 +363,22 @@ fn main() {
                 ),
         )
         .arg(
+            Arg::new("toolchain")
+                .long("toolchain")
+                .possible_values(["upstream", "anza"])
+                .default_value("anza")
+                .help("Toolchain passed through to cargo-build-sbf (`upstream` or `anza`)"),
+        )
+        .arg(
             Arg::new("tools_version")
                 .long("tools-version")
                 .value_name("STRING")
                 .takes_value(true)
                 .validator(is_version_string)
                 .help(
-                    "platform-tools version to use or to install, a version string, e.g. \"v1.32\"",
+                    "platform-tools version to use or to install, a version string, e.g. \
+                     \"v1.32\". WARNING: `--toolchain upstream` overrides this value. This flag \
+                     will soon be deprecated in favor of `--toolchain`",
                 ),
         )
         .get_matches_from(args);
@@ -375,6 +389,12 @@ fn main() {
              release."
         );
     }
+    if matches.is_present("tools_version") {
+        warn!(
+            "--tools-version will soon be deprecated in favor of --toolchain; --toolchain \
+             upstream overrides the value set here"
+        );
+    }
     let mut config = Config {
         sbf_out_dir: matches.value_of_t("sbf_out_dir").ok(),
         extra_cargo_test_args: matches
@@ -382,6 +402,7 @@ fn main() {
             .ok()
             .unwrap_or_default(),
         platform_tools_version: matches.value_of_t("tools_version").ok(),
+        toolchain: matches.value_of("toolchain").unwrap(),
         features: matches.values_of_t("features").ok().unwrap_or_default(),
         packages: matches.values_of_t("packages").ok().unwrap_or_default(),
         generate_child_script_on_failure: matches.is_present("generate_child_script_on_failure"),

@@ -1,6 +1,6 @@
 use {
     cargo_build_sbf::{
-        config::Config,
+        config::{BuildToolchain, Config},
         post_processing::post_process,
         toolchain::{
             DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION, corrupted_toolchain,
@@ -41,7 +41,41 @@ fn prepare_environment(
         exit(1);
     });
 
-    install_and_link_tools(config, package, metadata)
+    if config.toolchain == BuildToolchain::Upstream {
+        String::new()
+    } else {
+        install_and_link_tools(config, package, metadata)
+    }
+}
+
+fn lto_rustflags(toolchain: BuildToolchain, lto_requested: bool) -> Option<&'static str> {
+    match (toolchain, lto_requested) {
+        (BuildToolchain::Anza, true) => Some("-C embed-bitcode=yes -C lto=fat"),
+        (BuildToolchain::Upstream, _) => Some("-C lto=false"),
+        (BuildToolchain::Anza, false) => None,
+    }
+}
+
+fn cargo_profile_lto_env(debug: bool, cargo_args: &[&str]) -> String {
+    let profile = cargo_args
+        .windows(2)
+        .find_map(|args| (args[0] == "--profile").then_some(args[1]))
+        .or_else(|| {
+            cargo_args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--profile="))
+        })
+        .unwrap_or_else(|| {
+            if !debug || cargo_args.contains(&"--release") {
+                "release"
+            } else {
+                "dev"
+            }
+        });
+    format!(
+        "CARGO_PROFILE_{}_LTO",
+        profile.to_uppercase().replace('-', "_")
+    )
 }
 
 fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_version: String) {
@@ -54,7 +88,7 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         info!("Features: {}", config.features.join(" "));
     }
 
-    if corrupted_toolchain(platform_tools_dir) {
+    if config.toolchain == BuildToolchain::Anza && corrupted_toolchain(platform_tools_dir) {
         error!(
             "The Solana toolchain is corrupted. Please, run cargo-build-sbf with the \
              --force-tools-install argument to fix it."
@@ -62,14 +96,22 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
         exit(1);
     }
 
-    let llvm_bin = platform_tools_dir.join("llvm").join("bin");
-    // Override the behavior of cargo to use the Solana toolchain.
-    // Safety: cargo-build-sbf doesn't spawn any threads until final child process is spawned
-    unsafe {
-        env::set_var("CC", llvm_bin.join("clang"));
-        env::set_var("AR", llvm_bin.join("llvm-ar"));
-        env::set_var("OBJDUMP", llvm_bin.join("llvm-objdump"));
-        env::set_var("OBJCOPY", llvm_bin.join("llvm-objcopy"));
+    if config.toolchain == BuildToolchain::Anza {
+        let llvm_bin = platform_tools_dir.join("llvm").join("bin");
+        // Override the behavior of cargo to use the Solana toolchain.
+        // Safety: cargo-build-sbf doesn't spawn any threads until final child process is spawned
+        unsafe {
+            env::set_var("CC", llvm_bin.join("clang"));
+            env::set_var("AR", llvm_bin.join("llvm-ar"));
+            env::set_var("OBJDUMP", llvm_bin.join("llvm-objdump"));
+            env::set_var("OBJCOPY", llvm_bin.join("llvm-objcopy"));
+        }
+    } else {
+        // Override profile settings such as `lto = "fat"` in Cargo.toml. The explicit
+        // `-C lto=false` added below also takes precedence over LTO in user rustflags.
+        let profile_lto_env = cargo_profile_lto_env(config.debug, &config.cargo_args);
+        // Safety: cargo-build-sbf doesn't spawn any threads until final child process is spawned
+        unsafe { env::set_var(profile_lto_env, "false") }
     }
     let cargo_target = format!(
         "CARGO_TARGET_{}_RUSTFLAGS",
@@ -91,18 +133,37 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
     if config.optimize_size {
         target_rustflags = Cow::Owned(format!("{target_rustflags} -C opt-level=s"));
     }
-    if config.lto {
-        target_rustflags = Cow::Owned(format!(
-            "{target_rustflags} -C embed-bitcode=yes -C lto=fat",
-        ));
+    if let Some(lto_rustflags) = lto_rustflags(config.toolchain, config.lto) {
+        target_rustflags = Cow::Owned(format!("{target_rustflags} {lto_rustflags}"));
     }
-    if let Some(stack_size) = config.sbf_stack_size {
+    if let Some(stack_size) = config.sbf_stack_size
+        && config.toolchain == BuildToolchain::Anza
+    {
         target_rustflags = Cow::Owned(format!(
             "{target_rustflags} -C llvm-args=-sbf-stack-size={stack_size}",
         ));
     }
 
-    if config.arch == "v3" || config.arch == "v4" {
+    if config.toolchain == BuildToolchain::Upstream {
+        let stack_size = config.sbf_stack_size.unwrap_or(4096);
+        let (target_cpu, linker_arch) = if config.arch == "v0" {
+            ("v2", " -C link-arg=--arch=v0")
+        } else {
+            ("v4", "")
+        };
+        target_rustflags = Cow::Owned(format!(
+            "{target_rustflags} -C linker=sbpf-linker -C panic=abort -C relocation-model=static \
+             -C target-cpu={} -C target-feature=+allows-misaligned-mem-access -C \
+             link-arg=--llvm-args=--bpf-stack-size={stack_size} -C \
+             link-arg=--llvm-args=--bpf-max-stores-per-memfunc=5 -C \
+             link-arg=--llvm-args=--disable-gotox -C link-arg=--llvm-args=--disable-ldsx -C \
+             link-arg=--llvm-args=--disable-movsx -C link-arg=--llvm-args=--disable-bswap \
+             --cfg=target_os=\"solana\" \
+             --cfg=target_feature=\"static-syscalls\" -A \
+             explicit_builtin_cfgs_in_flags{linker_arch}",
+            target_cpu,
+        ));
+    } else if config.arch == "v3" || config.arch == "v4" {
         target_rustflags = Cow::Owned(format!(
             "{target_rustflags} -C link-arg=-z -C link-arg=defs",
         ));
@@ -124,13 +185,18 @@ fn invoke_cargo(config: &Config, platform_tools_dir: &Path, validated_toolchain_
     let mut cargo_build_args = vec![];
 
     let mut toolchain_name: String;
-    if !config.no_rustup_override {
+    if config.toolchain == BuildToolchain::Upstream {
+        cargo_build_args.push("+nightly");
+    } else if !config.no_rustup_override {
         toolchain_name = generate_toolchain_name(validated_toolchain_version.as_str());
         toolchain_name = format!("+{toolchain_name}");
         cargo_build_args.push(toolchain_name.as_str());
     };
 
     cargo_build_args.append(&mut vec!["build", "--target", &target_triple]);
+    if config.toolchain == BuildToolchain::Upstream {
+        cargo_build_args.push("-Zbuild-std=core,alloc");
+    }
     if !config.debug {
         cargo_build_args.push("--release");
     }
@@ -411,13 +477,25 @@ fn main() {
                 .help("Run without accessing the network"),
         )
         .arg(
+            Arg::new("toolchain")
+                .long("toolchain")
+                .possible_values(["upstream", "anza"])
+                .default_value("anza")
+                .help(
+                    "Toolchain to use. `upstream` uses the upstream Rust/LLVM toolchain and \
+                     sbpf-linker; `anza` uses platform-tools",
+                ),
+        )
+        .arg(
             Arg::new("tools_version")
                 .long("tools-version")
                 .value_name("STRING")
                 .takes_value(true)
                 .validator(is_version_string)
                 .help(
-                    "platform-tools version to use or to install, a version string, e.g. \"v1.32\"",
+                    "platform-tools version to use or to install, a version string, e.g. \
+                     \"v1.32\". WARNING: `--toolchain upstream` overrides this value. This flag \
+                     will soon be deprecated in favor of `--toolchain`",
                 ),
         )
         .arg(
@@ -479,8 +557,8 @@ fn main() {
         )
         .arg(Arg::new("lto").long("lto").takes_value(false).help(
             "Enable Link-Time Optimization (LTO) for all crates being built. This option may \
-             decrease program size and CU consumption. The default option is LTO disabled, as one \
-             may get mixed results with it.",
+             decrease program size and CU consumption. The option is ignored when using the \
+             upstream toolchain.",
         ))
         .arg(
             Arg::new("patch_binaries_for_nix")
@@ -533,6 +611,13 @@ fn main() {
         None
     };
 
+    if matches.is_present("tools_version") {
+        warn!(
+            "--tools-version will soon be deprecated in favor of --toolchain; --toolchain \
+             upstream overrides the value set here"
+        );
+    }
+
     let config = Config {
         cargo_args,
         target_directory,
@@ -546,6 +631,10 @@ fn main() {
             }
         }),
         platform_tools_version: matches.value_of("tools_version"),
+        toolchain: match matches.value_of("toolchain").unwrap() {
+            "upstream" => BuildToolchain::Upstream,
+            _ => BuildToolchain::Anza,
+        },
         dump: matches.is_present("dump"),
         features: matches.values_of_t("features").ok().unwrap_or_default(),
         force_tools_install: matches.is_present("force_tools_install"),
@@ -571,8 +660,19 @@ fn main() {
         use_abi_v2: matches.is_present("abi_v2"),
     };
 
+    if config.toolchain == BuildToolchain::Upstream {
+        warn!(
+            "LTO must be disabled when using --toolchain upstream; --lto, `-C lto=fat`, and \
+             `lto = \"fat\"` profile settings are ignored"
+        );
+    }
+
     if config.use_abi_v2 && config.arch != "v3" {
         error!("--abi-v2 requires --arch v3");
+        exit(1);
+    }
+    if config.toolchain == BuildToolchain::Upstream && !matches!(config.arch, "v0" | "v3") {
+        error!("--toolchain upstream only supports --arch v0 and --arch v3");
         exit(1);
     }
 
@@ -587,6 +687,10 @@ fn main() {
         .unwrap_or(DEFAULT_PLATFORM_TOOLS_VERSION);
 
     if config.install_only {
+        if config.toolchain == BuildToolchain::Upstream {
+            error!("--install-only is only supported with --toolchain anza");
+            exit(1);
+        }
         let platform_tools_version =
             validate_platform_tools_version(tools_version, DEFAULT_PLATFORM_TOOLS_VERSION);
         if !install_tools(&config, &platform_tools_version, true) {
@@ -602,4 +706,47 @@ fn main() {
 
     // Repeat the warning so the build output doesn't bury it.
     warn_if_installed_with_solana_cli();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_lto_rustflags() {
+        assert_eq!(lto_rustflags(BuildToolchain::Anza, false), None);
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Upstream, false),
+            Some("-C lto=false")
+        );
+    }
+
+    #[test]
+    fn test_lto_flag_only_enables_fat_lto_for_anza() {
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Anza, true),
+            Some("-C embed-bitcode=yes -C lto=fat")
+        );
+        assert_eq!(
+            lto_rustflags(BuildToolchain::Upstream, true),
+            Some("-C lto=false")
+        );
+    }
+
+    #[test]
+    fn test_cargo_profile_lto_env() {
+        assert_eq!(
+            cargo_profile_lto_env(false, &[]),
+            "CARGO_PROFILE_RELEASE_LTO"
+        );
+        assert_eq!(cargo_profile_lto_env(true, &[]), "CARGO_PROFILE_DEV_LTO");
+        assert_eq!(
+            cargo_profile_lto_env(true, &["--profile", "sbf-release"]),
+            "CARGO_PROFILE_SBF_RELEASE_LTO"
+        );
+        assert_eq!(
+            cargo_profile_lto_env(true, &["--profile=bench"]),
+            "CARGO_PROFILE_BENCH_LTO"
+        );
+    }
 }

@@ -1,11 +1,19 @@
 use {cargo_metadata::camino::Utf8PathBuf, std::path::PathBuf};
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BuildToolchain {
+    #[default]
+    Anza,
+    Upstream,
+}
+
 #[derive(Debug)]
 pub struct Config<'a> {
     pub cargo_args: Vec<&'a str>,
     pub target_directory: Option<Utf8PathBuf>,
     pub sbf_out_dir: Option<PathBuf>,
     pub platform_tools_version: Option<&'a str>,
+    pub toolchain: BuildToolchain,
     pub dump: bool,
     pub features: Vec<String>,
     pub force_tools_install: bool,
@@ -36,6 +44,7 @@ impl Default for Config<'_> {
             target_directory: None,
             sbf_out_dir: None,
             platform_tools_version: None,
+            toolchain: BuildToolchain::default(),
             dump: false,
             features: vec![],
             force_tools_install: false,
