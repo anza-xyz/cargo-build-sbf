@@ -1,10 +1,17 @@
 use {
-    assert_cmd::{assert::Assert, cargo::cargo_bin_cmd},
+    assert_cmd::{Command, assert::Assert, cargo::cargo_bin_cmd},
     cargo_build_sbf::toolchain::{
         DEFAULT_PLATFORM_TOOLS_VERSION, DEFAULT_RUST_VERSION, get_base_rust_version,
     },
     predicates::prelude::*,
-    std::{env, fs, path::PathBuf, str::FromStr},
+    std::{
+        env,
+        fs::{self, File},
+        path::{Path, PathBuf},
+        str::FromStr,
+        thread,
+        time::{Duration, Instant},
+    },
 };
 
 #[macro_use]
@@ -465,4 +472,140 @@ fn test_version() {
             "Default platform-tools: {DEFAULT_PLATFORM_TOOLS_VERSION}\nDefault Rust: \
              {DEFAULT_RUST_VERSION}\n"
         )));
+}
+
+// ---------------------------------------------------------------------------
+// Platform-tools installation tests.
+// ---------------------------------------------------------------------------
+
+fn tools_dir(test_name: &str) -> PathBuf {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join("install")
+        .join(test_name);
+    // Ignore the error: the directory doesn't exist on the first run.
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn version_dir(dir: &Path) -> PathBuf {
+    dir.join(DEFAULT_PLATFORM_TOOLS_VERSION)
+}
+
+fn target_path(dir: &Path) -> PathBuf {
+    version_dir(dir).join("platform-tools")
+}
+
+fn staging_path(dir: &Path) -> PathBuf {
+    version_dir(dir).join("platform-tools.partial")
+}
+
+fn is_complete_install(target_path: &Path) -> bool {
+    let rustc = if cfg!(windows) { "rustc.exe" } else { "rustc" };
+    target_path.join("rust").join("bin").join(rustc).is_file()
+        && target_path.join("llvm").join("bin").is_dir()
+}
+
+fn install_process(dir: &Path) -> std::process::Command {
+    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_cargo-build-sbf"));
+    command
+        .env("SOLANA_PLATFORM_TOOLS_DIR", dir)
+        .arg("--install-only")
+        .arg("--tools-version")
+        .arg(DEFAULT_PLATFORM_TOOLS_VERSION);
+    command
+}
+
+fn install_command(dir: &Path) -> Command {
+    Command::from_std(install_process(dir))
+}
+
+#[test]
+fn test_corrupted_install() {
+    let dir = tools_dir("corrupted_install");
+    let staging = staging_path(&dir);
+    fs::create_dir_all(&staging).unwrap();
+    fs::write(staging.join("archive.tar.bz2"), b"truncated download").unwrap();
+    fs::write(staging.join("junk"), b"half-unpacked file").unwrap();
+    assert!(staging.join("junk").exists());
+
+    install_command(&dir).assert().success();
+
+    assert!(is_complete_install(&target_path(&dir)));
+    assert!(
+        !target_path(&dir).join("junk").exists(),
+        "files from the interrupted install must not end up in the toolchain"
+    );
+    assert!(
+        !staging.exists(),
+        "staging directory from the interrupted install should be removed"
+    );
+
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+#[serial]
+fn test_lockfile_contention() {
+    const TIMEOUT: Duration = Duration::from_secs(600);
+    const POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+    let dir = tools_dir("lockfile_contention");
+    let target = target_path(&dir);
+
+    let stderr_paths = [dir.join("first.stderr"), dir.join("second.stderr")];
+    let mut children = stderr_paths.clone().map(|stderr_path| {
+        install_process(&dir)
+            .stderr(File::create(stderr_path).unwrap())
+            .spawn()
+            .unwrap()
+    });
+
+    let started = Instant::now();
+    let mut statuses = [None, None];
+    let mut corrupted_seen = false;
+    while statuses.iter().any(Option::is_none) {
+        if target.exists() && !is_complete_install(&target) {
+            corrupted_seen = true;
+        }
+        for (child, status) in children.iter_mut().zip(statuses.iter_mut()) {
+            if status.is_none() {
+                *status = child.try_wait().unwrap();
+            }
+        }
+        if started.elapsed() > TIMEOUT {
+            for child in &mut children {
+                let _ = child.kill();
+            }
+            panic!("installs did not finish within {TIMEOUT:?}");
+        }
+        thread::sleep(POLL_INTERVAL);
+    }
+
+    // Assert
+    let stderrs = stderr_paths.map(|path| fs::read_to_string(path).unwrap());
+    for (status, stderr) in statuses.iter().zip(&stderrs) {
+        assert!(status.unwrap().success(), "install failed:\n{stderr}");
+    }
+    assert!(
+        !corrupted_seen,
+        "{target:?} was observed partially installed"
+    );
+    assert!(is_complete_install(&target));
+    assert!(!staging_path(&dir).exists());
+
+    // Exactly one process downloads; the other waits for the lock and then should find that it's
+    // already installed
+    let downloads = stderrs
+        .iter()
+        .filter(|stderr| stderr.contains("Downloading platform-tools"))
+        .count();
+    let waits = stderrs
+        .iter()
+        .filter(|stderr| stderr.contains("Waiting for another process"))
+        .count();
+    assert_eq!(downloads, 1, "stderr:\n{stderrs:#?}");
+    assert_eq!(waits, 1, "stderr:\n{stderrs:#?}");
+
+    fs::remove_dir_all(&dir).unwrap();
 }
