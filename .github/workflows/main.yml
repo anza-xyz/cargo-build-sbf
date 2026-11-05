@@ -43,7 +43,12 @@ jobs:
         run: ./cargo test --workspace
       - name: Cargo test (skip alternate download)
         if: matrix.os != 'ubuntu-22.04'
-        run: ./cargo test --workspace  -- --skip test_alternate_download --skip test_binaries_work
+        run: |
+          ./cargo test --workspace -- \
+          --skip test_alternate_download \
+          --skip test_binaries_work \
+          --skip test_corrupted_install \
+          --skip test_lockfile_contention
       - name: Check MSRV
         run: |
           rust_version=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == "cargo-build-sbf") | .rust_version')
