@@ -42,7 +42,7 @@ serde = { workspace = true }
 solana-define-syscall = "5.4.0"
 solana-file-download = "=3.1.4"
 solana-keypair = "=4.0.0"
-solana-sbpf = { version = "0.26.0", default-features = false }
+solana-sbpf = { version = "0.27.0", default-features = false }
 tar = { workspace = true }
 
 [dev-dependencies]
