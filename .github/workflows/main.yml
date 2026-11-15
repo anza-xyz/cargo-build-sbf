@@ -8,6 +8,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   test_check:
     name: Test and Check
@@ -39,16 +42,9 @@ jobs:
           --deny=clippy::manual_let_else --deny=clippy::uninlined-format-args \
           --deny=clippy::used_underscore_binding
       - name: Cargo test
-        if: matrix.os == 'ubuntu-22.04'
         run: ./cargo test --workspace
-      - name: Cargo test (skip alternate download)
-        if: matrix.os != 'ubuntu-22.04'
-        run: |
-          ./cargo test --workspace -- \
-          --skip test_alternate_download \
-          --skip test_binaries_work \
-          --skip test_corrupted_install \
-          --skip test_lockfile_contention
+        env:
+          CARGO_BUILD_SBF_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check MSRV
         run: |
           rust_version=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == "cargo-build-sbf") | .rust_version')

@@ -24,6 +24,8 @@ use {
 pub const DEFAULT_PLATFORM_TOOLS_VERSION: &str = "v1.58";
 pub const DEFAULT_RUST_VERSION: &str = "1.95.0";
 
+const GITHUB_API_URL: &str = "https://api.github.com/";
+
 // Common headers used for Github API.
 const USER_AGENT_HEADER: (&str, &str) = ("User-Agent", "cargo-build-sbf");
 const GITHUB_API_VERSION_HEADER: (&str, &str) = ("X-GitHub-Api-Version", "2022-11-28");
@@ -181,15 +183,20 @@ fn retrieve_file_from_github_api(
     }
 
     let client = reqwest::blocking::Client::new();
-    let query_url = format!("https://api.github.com/repos/anza-xyz/platform-tools/releases/tags/{platform_tools_version}");
+    let query_url = format!(
+        "{GITHUB_API_URL}repos/anza-xyz/platform-tools/releases/tags/{platform_tools_version}"
+    );
+    let token = github_api_token();
 
     let mut query_headers = reqwest::header::HeaderMap::new();
     for item in GITHUB_API_JSON_RESPONSE_HEADERS {
         query_headers.insert(item.0, item.1.parse().unwrap());
     }
-    let response = client
-        .get(query_url)
-        .headers(query_headers)
+    let mut request = client.get(query_url).headers(query_headers);
+    if let Some(token) = &token {
+        request = request.bearer_auth(token);
+    }
+    let response = request
         .send()
         .map_err(|err| format!("Failed to retrieve Github releases: {err}"))?;
 
@@ -209,8 +216,26 @@ fn retrieve_file_from_github_api(
         download_file_path,
         true,
         &mut None,
-        &GITHUB_API_BYTES_RESPONSE_HEADERS,
+        &github_api_download_headers(download_url, token.as_deref()),
     )
+}
+
+fn github_api_token() -> Option<String> {
+    env::var("CARGO_BUILD_SBF_GITHUB_TOKEN")
+        .ok()
+        .map(|token| token.trim().to_string())
+        .filter(|token| !token.is_empty())
+}
+
+fn github_api_download_headers(download_url: &str, token: Option<&str>) -> Vec<(String, String)> {
+    let mut headers: Vec<_> = GITHUB_API_BYTES_RESPONSE_HEADERS
+        .iter()
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect();
+    if let Some(token) = token.filter(|_| download_url.starts_with(GITHUB_API_URL)) {
+        headers.push(("Authorization".to_string(), format!("Bearer {token}")));
+    }
+    headers
 }
 
 fn retrieve_file_from_browser_url(
