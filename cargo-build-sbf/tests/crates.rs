@@ -173,6 +173,26 @@ fn test_target_dir() {
 
 #[test]
 #[serial]
+fn test_target_dir_equals_form() {
+    let target_dir = "./temp-target-dir-eq";
+    run_cargo_build(
+        "noop",
+        &["--lto", "--", &format!("--target-dir={target_dir}")],
+        false,
+    );
+    let cwd = env::current_dir().expect("Unable to get current working directory");
+    let normal_target_dir = cwd.join("tests").join("crates").join("noop").join("target");
+    assert!(!normal_target_dir.exists());
+    let so_file = PathBuf::from_str(target_dir)
+        .unwrap()
+        .join("deploy")
+        .join("noop.so");
+    assert!(so_file.exists());
+    fs::remove_dir_all(target_dir).expect("Failed to remove custom target dir");
+}
+
+#[test]
+#[serial]
 fn test_target_and_out_dir() {
     let target_dir = "./temp-target-dir";
     run_cargo_build(
