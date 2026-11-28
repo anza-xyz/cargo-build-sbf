@@ -509,16 +509,28 @@ fn main() {
         .map(|vals| vals.collect::<Vec<_>>())
         .unwrap_or_default();
 
+    // Cargo accepts both `--target-dir <DIR>` and `--target-dir=<DIR>`.
     let target_dir_string;
-    let target_directory = if let Some(target_dir) = cargo_args
-        .iter_mut()
-        .skip_while(|x| x != &&"--target-dir")
-        .nth(1)
-    {
-        let target_path = Utf8PathBuf::from(*target_dir);
+    let target_dir_arg = cargo_args
+        .iter()
+        .position(|x| *x == "--target-dir" || x.starts_with("--target-dir="));
+    let target_dir_inline =
+        target_dir_arg.is_some_and(|i| cargo_args[i].starts_with("--target-dir="));
+    let target_dir_value = match target_dir_arg {
+        Some(i) if target_dir_inline => Some(i),
+        Some(i) => Some(i.saturating_add(1)).filter(|j| *j < cargo_args.len()),
+        None => None,
+    };
+    let target_directory = if let Some(value_index) = target_dir_value {
+        let target_dir = &mut cargo_args[value_index];
+        let target_path = Utf8PathBuf::from(
+            target_dir
+                .strip_prefix("--target-dir=")
+                .unwrap_or(target_dir),
+        );
         // Directory needs to exist in order to canonicalize it
         fs::create_dir_all(&target_path).unwrap_or_else(|err| {
-            error!("Unable to create target-dir directory {target_dir}: {err}");
+            error!("Unable to create target-dir directory {target_path}: {err}");
             exit(1);
         });
         // Canonicalize the path to avoid issues with relative paths
@@ -526,7 +538,11 @@ fn main() {
             error!("Unable to canonicalize provided target-dir directory {target_path}: {err}");
             exit(1);
         });
-        target_dir_string = canonicalized.to_string();
+        target_dir_string = if target_dir_inline {
+            format!("--target-dir={canonicalized}")
+        } else {
+            canonicalized.to_string()
+        };
         *target_dir = &target_dir_string;
         Some(canonicalized)
     } else {
